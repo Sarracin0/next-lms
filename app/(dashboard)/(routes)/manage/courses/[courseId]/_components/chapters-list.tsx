@@ -3,7 +3,7 @@
 import { Chapter } from '@prisma/client'
 import { useEffect, useState } from 'react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { Grip, Pencil } from 'lucide-react'
+import { Clock, Grip, Pencil, Video } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -62,31 +62,58 @@ export const ChaptersList = ({ items, onReorder, onEdit }: ChaptersListProps) =>
                 {(provided) => (
                   <div
                     className={cn(
-                      'mb-4 flex items-center gap-x-2 rounded-md border border-slate-200 bg-slate-200 text-sm text-slate-700',
-                      chapter.isPublished && 'border-sky-200 bg-sky-100 text-sky-700',
+                      'mb-4 flex items-center gap-x-3 rounded-xl border border-border/60 bg-card/80 px-3 py-3 text-sm text-foreground shadow-sm transition hover:border-primary/40 hover:bg-card',
+                      chapter.isPublished && 'border-emerald-200 bg-emerald-50 text-emerald-700',
                     )}
                     ref={provided.innerRef}
                     {...provided.draggableProps}
+                    onClick={() => onEdit(chapter.id)}
                   >
                     <div
                       className={cn(
-                        'rounded-l-md border-r border-r-slate-200 px-2 py-3 transition hover:bg-slate-300',
-                        chapter.isPublished && 'border-r-sky-200 hover:bg-sky-200',
+                        'rounded-md border border-border/40 bg-muted/40 px-2 py-3 transition hover:bg-muted',
+                        chapter.isPublished && 'border-emerald-200 bg-emerald-100/60 hover:bg-emerald-100',
                       )}
                       {...provided.dragHandleProps}
                     >
                       <Grip className="h-5 w-5" />
                     </div>
-                    {chapter.title}
-                    <div className="ml-auto flex items-center gap-x-2 pr-2">
-                      {chapter.isPreview && <Badge variant="outline">Preview</Badge>}
-                      <Badge className={cn('bg-slate-500', chapter.isPublished && 'bg-sky-700')}>
-                        {chapter.isPublished ? 'Published' : 'Draft'}
-                      </Badge>
-                      <Pencil
-                        onClick={() => onEdit(chapter.id)}
-                        className="h-4 w-4 cursor-pointer transition hover:opacity-75"
-                      />
+                    <div className="flex flex-1 items-center justify-between gap-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold">{chapter.title}</span>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {chapter.estimatedDurationMinutes ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {chapter.estimatedDurationMinutes} min
+                            </span>
+                          ) : null}
+                          {chapter.videoUrl ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Video className="h-3 w-3" />
+                              Video attached
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <Video className="h-3 w-3" />
+                              Media pending
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-x-2">
+                        {chapter.isPreview && <Badge variant="outline">Preview</Badge>}
+                        <Badge className={cn('bg-slate-500', chapter.isPublished && 'bg-emerald-600')}> 
+                          {chapter.isPublished ? 'Published' : 'Draft'}
+                        </Badge>
+                        <Pencil
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onEdit(chapter.id)
+                          }}
+                          className="h-4 w-4 cursor-pointer text-muted-foreground transition hover:text-primary"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

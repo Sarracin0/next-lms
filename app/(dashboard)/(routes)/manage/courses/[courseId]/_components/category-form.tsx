@@ -53,7 +53,7 @@ export default function CategoryForm({ initialData, courseId, options }: Categor
   const selectedOption = options.find((option) => option.value === initialData?.categoryId)
 
   return (
-    <div className="mt-6 rounded-md border bg-slate-100 p-4 md:mt-0">
+    <div className="rounded-xl border border-border/60 bg-card/80 p-6 shadow-sm transition-colors hover:border-primary/40">
       <div className="flex items-center justify-between font-medium">
         Course Category
         <Button variant="ghost" onClick={toggleEdit}>

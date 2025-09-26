@@ -62,7 +62,7 @@ export const MetaForm = ({ courseId, initialData }: MetaFormProps) => {
   }
 
   return (
-    <div className="mt-4 rounded-lg border bg-white p-4">
+    <div className="rounded-xl border border-border/60 bg-card/80 p-6 shadow-sm transition-colors hover:border-primary/40">
       <Form {...form}>
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <FormField

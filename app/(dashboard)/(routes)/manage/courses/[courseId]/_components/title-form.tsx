@@ -51,7 +51,7 @@ export const TitleForm = ({ initialData, courseId }: TitleFormProps) => {
   }
 
   return (
-    <div className="mt-6 rounded-md border bg-slate-100 p-4">
+    <div className="rounded-xl border border-border/60 bg-card/80 p-6 shadow-sm transition-colors hover:border-primary/40">
       <div className="flex items-center justify-between font-medium">
         Course title
         <Button onClick={toggleEdit} variant="ghost">
@@ -65,7 +65,7 @@ export const TitleForm = ({ initialData, courseId }: TitleFormProps) => {
           )}
         </Button>
       </div>
-      {!isEditing && <p className="mt-2 text-sm">{initialData.title}</p>}
+      {!isEditing && <p className="mt-2 text-base font-semibold text-foreground">{initialData.title}</p>}
       {isEditing && (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-4">

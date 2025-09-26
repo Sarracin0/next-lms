@@ -31,8 +31,9 @@ export async function PATCH(request: NextRequest, { params }: { params: RoutePar
     }
 
     const hasPublishedChapter = course.chapters.some((chapter) => chapter.isPublished)
+    const hasLessonMedia = course.chapters.some((chapter) => chapter.videoUrl || chapter.contentUrl)
 
-    if (!course.title || !course.description || !course.imageUrl || !course.categoryId || !hasPublishedChapter) {
+    if (!course.title || !course.description || !hasPublishedChapter || !hasLessonMedia) {
       return new NextResponse('Missing required fields', { status: 400 })
     }
 

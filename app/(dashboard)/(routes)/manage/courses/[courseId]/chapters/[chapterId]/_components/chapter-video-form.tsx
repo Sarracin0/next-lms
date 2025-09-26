@@ -3,12 +3,13 @@
 import * as z from 'zod'
 import axios from 'axios'
 import { Pencil, PlusCircle, Video } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
 import { Chapter } from '@prisma/client'
 import { Button } from '@/components/ui/button'
 import { FileUpload } from '@/components/file-upload'
+import { Input } from '@/components/ui/input'
 
 interface ChapterVideoFormProps {
   initialData: Chapter
@@ -22,10 +23,16 @@ const formSchema = z.object({
 
 export const ChapterVideoForm = ({ initialData, courseId, chapterId }: ChapterVideoFormProps) => {
   const [isEditing, setIsEditing] = useState(false)
+  const [manualUrl, setManualUrl] = useState(initialData.videoUrl ?? '')
+  const [isSavingLink, setIsSavingLink] = useState(false)
 
   const toggleEdit = () => setIsEditing((current) => !current)
 
   const router = useRouter()
+
+  useEffect(() => {
+    setManualUrl(initialData.videoUrl ?? '')
+  }, [initialData.videoUrl])
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -36,6 +43,22 @@ export const ChapterVideoForm = ({ initialData, courseId, chapterId }: ChapterVi
       router.refresh()
     } catch {
       toast.error('Something went wrong')
+    }
+  }
+
+  const onSaveManualLink = async () => {
+    if (!manualUrl) {
+      toast.error('Add a valid URL before saving')
+      return
+    }
+
+    try {
+      setIsSavingLink(true)
+      await onSubmit({ videoUrl: manualUrl })
+    } catch {
+      toast.error('Unable to save link')
+    } finally {
+      setIsSavingLink(false)
     }
   }
 
@@ -75,16 +98,40 @@ export const ChapterVideoForm = ({ initialData, courseId, chapterId }: ChapterVi
           </div>
         ))}
       {isEditing && (
-        <div>
-          <FileUpload
-            endpoint="chapterVideo"
-            onChange={(url) => {
-              if (url) {
-                onSubmit({ videoUrl: url })
-              }
-            }}
-          />
-          <div className="mt-4 text-xs text-muted-foreground">Upload this chapter&apos;s video</div>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-dashed border-border/60 bg-muted/40 p-4">
+            <p className="text-sm font-medium text-foreground">Upload a video file</p>
+            <p className="text-xs text-muted-foreground">
+              We use UploadThing for secure storage. Ensure `UPLOADTHING_TOKEN` is configured in your environment.
+            </p>
+            <div className="mt-3">
+              <FileUpload
+                endpoint="chapterVideo"
+                onChange={(url) => {
+                  if (url) {
+                    onSubmit({ videoUrl: url })
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+            <p className="text-sm font-medium text-foreground">…or paste a hosted link</p>
+            <p className="text-xs text-muted-foreground">
+              Link to an MP4, Vimeo, YouTube unlisted, or any internal streaming URL your company already uses.
+            </p>
+            <div className="mt-3 flex flex-col gap-2 md:flex-row">
+              <Input
+                placeholder="https://"
+                value={manualUrl}
+                onChange={(event) => setManualUrl(event.target.value)}
+                disabled={isSavingLink}
+              />
+              <Button onClick={onSaveManualLink} disabled={isSavingLink}>
+                {isSavingLink ? 'Saving…' : 'Save link'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
       {initialData.videoUrl && !isEditing && (

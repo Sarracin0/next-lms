@@ -204,15 +204,18 @@ model Course {
 model Attachment {
   id        String   @id @default(cuid())
   courseId  String
+  chapterId String?
   name      String
   url       String
   type      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chapter Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
   @@index([courseId])
+  @@index([chapterId])
 }
 
 model Chapter {
@@ -229,9 +232,10 @@ model Chapter {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  course   Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  progress UserProgress[]
-  missions QuestMission[]
+  course      Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress    UserProgress[]
+  missions    QuestMission[]
+  attachments Attachment[]
 
   @@index([courseId])
 }

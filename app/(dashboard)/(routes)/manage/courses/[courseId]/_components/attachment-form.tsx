@@ -28,6 +28,8 @@ export const AttachmentForm = ({ initialData, courseId }: AttachmentFormProps) =
 
   const router = useRouter()
 
+  const attachments = initialData.attachments.filter((attachment) => attachment.chapterId == null)
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       formSchema.parse(values)
@@ -54,7 +56,7 @@ export const AttachmentForm = ({ initialData, courseId }: AttachmentFormProps) =
   }
 
   return (
-    <div className="mt-6 rounded-md border bg-slate-100 p-4">
+    <div className="rounded-xl border border-dashed border-border/70 bg-card/80 p-6 shadow-sm transition-colors hover:border-primary/40">
       <div className="flex items-center justify-between font-medium">
         Course attachments
         <Button onClick={toggleEdit} variant="ghost">
@@ -69,18 +71,18 @@ export const AttachmentForm = ({ initialData, courseId }: AttachmentFormProps) =
       </div>
       {!isEditing && (
         <>
-          {initialData.attachments.length === 0 && (
-            <p className="mt-2 text-sm italic text-slate-500">No attachments yet</p>
+          {attachments.length === 0 && (
+            <p className="mt-4 text-sm italic text-muted-foreground">No attachments yet</p>
           )}
-          {initialData.attachments.length > 0 && (
+          {attachments.length > 0 && (
             <div className="space-y-2">
-              {initialData.attachments.map((attachment) => (
+              {attachments.map((attachment) => (
                 <div
                   key={attachment.id}
-                  className="flex w-full items-center rounded-md border border-sky-200 bg-sky-100 p-3 text-sky-700"
+                  className="flex w-full items-center gap-3 rounded-lg border border-border/60 bg-muted/40 p-3 text-sm text-foreground"
                 >
-                  <File className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <p className="line-clamp-1 text-xs">{attachment.name}</p>
+                  <File className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <p className="line-clamp-1 flex-1 text-xs font-medium text-muted-foreground">{attachment.name}</p>
                   {deletingId === attachment.id && (
                     <div>
                       <Loader2 className="h-4 w-4 animate-spin" />

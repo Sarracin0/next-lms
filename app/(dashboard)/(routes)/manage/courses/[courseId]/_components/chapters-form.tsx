@@ -8,15 +8,16 @@ import { Loader2, PlusCircle } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
-import { Chapter, Course } from '@prisma/client'
+import { Attachment, Chapter, Course } from '@prisma/client'
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { ChaptersList } from './chapters-list'
+import { LessonWorkspaceSheet } from './lesson-workspace-sheet'
 
 interface ChaptersFormProps {
-  initialData: Course & { chapters: Chapter[] }
+  initialData: Course & { chapters: Chapter[]; attachments: Attachment[] }
   courseId: string
 }
 
@@ -27,6 +28,7 @@ const formSchema = z.object({
 export const ChaptersForm = ({ initialData, courseId }: ChaptersFormProps) => {
   const [isCreating, setIsCreating] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null)
 
   const toggleCreating = () => {
     setIsCreating((current) => !current)
@@ -72,25 +74,33 @@ export const ChaptersForm = ({ initialData, courseId }: ChaptersFormProps) => {
   }
 
   const onEdit = (id: string) => {
-    router.push(`/manage/courses/${courseId}/chapters/${id}`)
+    setSelectedChapterId(id)
   }
 
+  const selectedChapter = selectedChapterId
+    ? initialData.chapters.find((chapter) => chapter.id === selectedChapterId) ?? null
+    : null
+
+  const selectedChapterAttachments = selectedChapter
+    ? initialData.attachments.filter((attachment) => attachment.chapterId === selectedChapter.id)
+    : []
+
   return (
-    <div className="relative mt-6 rounded-md border bg-slate-100 p-4">
+    <div className="relative rounded-xl border border-dashed border-border/70 bg-card/80 p-6 shadow-sm transition-colors hover:border-primary/40">
       {isUpdating && (
-        <div className="rounded-m absolute right-0 top-0 flex h-full w-full items-center justify-center bg-slate-500/20">
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/60 backdrop-blur-sm">
           <Loader2 className="h-6 w-6 animate-spin text-sky-700" />
         </div>
       )}
       <div className="flex items-center justify-between font-medium">
-        Course chapters
+        Lessons
         <Button onClick={toggleCreating} variant="ghost">
           {isCreating ? (
             <>Cancel</>
           ) : (
             <>
               <PlusCircle className="mr-2 h-4 w-4" />
-              Add a chapter
+              Add a lesson
             </>
           )}
         </Button>
@@ -104,25 +114,38 @@ export const ChaptersForm = ({ initialData, courseId }: ChaptersFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
-                    <Input disabled={isSubmitting} placeholder="e.g. 'Introduction to the course'" {...field} />
+                    <Input disabled={isSubmitting} placeholder="e.g. 'Kick-off session'" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <Button disabled={!isValid || isSubmitting} type="submit">
-              Create
+              Create lesson
             </Button>
           </form>
         </Form>
       )}
       {!isCreating && (
-        <div className={cn('mt-2 text-sm', !initialData.chapters.length && 'italic text-slate-500')}>
-          {!initialData.chapters.length && 'No chapters'}
+        <div className={cn('mt-4 text-sm text-muted-foreground', !initialData.chapters.length && 'italic')}>
+          {!initialData.chapters.length && 'No lessons yet'}
           <ChaptersList onEdit={onEdit} onReorder={onReorder} items={initialData.chapters || []} />
         </div>
       )}
-      {!isCreating && <p className="mt-4 text-xs text-muted-foreground">Drag and drop to reorder the chapters</p>}
+      {!isCreating && <p className="mt-4 text-xs text-muted-foreground">Drag and drop to reorder the sequence</p>}
+      {selectedChapter ? (
+        <LessonWorkspaceSheet
+          courseId={courseId}
+          chapter={selectedChapter}
+          attachments={selectedChapterAttachments}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedChapterId(null)
+            }
+          }}
+          onChanged={() => router.refresh()}
+        />
+      ) : null}
     </div>
   )
 }

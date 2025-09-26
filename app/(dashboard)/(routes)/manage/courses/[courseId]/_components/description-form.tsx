@@ -53,7 +53,7 @@ export const DescriptionForm = ({ initialData, courseId }: DescriptionFormProps)
   }
 
   return (
-    <div className="mt-6 rounded-md border bg-slate-100 p-4">
+    <div className="rounded-xl border border-border/60 bg-card/80 p-6 shadow-sm transition-colors hover:border-primary/40">
       <div className="flex items-center justify-between font-medium">
         Course description
         <Button onClick={toggleEdit} variant="ghost">
