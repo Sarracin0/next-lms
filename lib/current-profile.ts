@@ -1,5 +1,5 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { UserRole } from '@prisma/client'
+import { Prisma, UserRole } from '@prisma/client'
 
 import { db } from './db'
 import { slugify } from './utils'
@@ -97,31 +97,56 @@ export async function getCurrentAuthContext() {
 
   if (!company) {
     const ensuredSlug = await ensureUniqueCompanySlug(initialSlug)
-    company = await db.company.create({
-      data: {
-        clerkOrgId: organizationId,
-        name: organizationName,
-        slug: ensuredSlug,
-        domain: (membership?.organization?.publicMetadata?.domain as string | undefined) ?? null,
-        logoUrl: membership?.organization?.imageUrl ?? null,
-      },
-    })
+
+    try {
+      company = await db.company.create({
+        data: {
+          clerkOrgId: organizationId,
+          name: organizationName,
+          slug: ensuredSlug,
+          domain: (membership?.organization?.publicMetadata?.domain as string | undefined) ?? null,
+          logoUrl: membership?.organization?.imageUrl ?? null,
+        },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        company = await db.company.findUnique({ where: { clerkOrgId: organizationId } })
+
+        if (!company) {
+          throw new Error('Failed to resolve company after duplicate creation attempt')
+        }
+      } else {
+        throw error
+      }
+    }
   }
 
   let profile = await db.userProfile.findUnique({ where: { userId } })
 
   if (!profile) {
-    profile = await db.userProfile.create({
-      data: {
-        userId,
-        companyId: company.id,
-        role: mapClerkRoleToUserRole(membership?.role),
-        jobTitle: (user?.publicMetadata?.jobTitle as string | undefined) ?? null,
-        department: (user?.publicMetadata?.department as string | undefined) ?? null,
-        avatarUrl: user?.imageUrl ?? null,
-        timezone: (user?.publicMetadata?.timezone as string | undefined) ?? null,
-      },
-    })
+    try {
+      profile = await db.userProfile.create({
+        data: {
+          userId,
+          companyId: company.id,
+          role: mapClerkRoleToUserRole(membership?.role),
+          jobTitle: (user?.publicMetadata?.jobTitle as string | undefined) ?? null,
+          department: (user?.publicMetadata?.department as string | undefined) ?? null,
+          avatarUrl: user?.imageUrl ?? null,
+          timezone: (user?.publicMetadata?.timezone as string | undefined) ?? null,
+        },
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        profile = await db.userProfile.findUnique({ where: { userId } })
+
+        if (!profile) {
+          throw new Error('Failed to resolve user profile after duplicate creation attempt')
+        }
+      } else {
+        throw error
+      }
+    }
   } else {
     const updates: Record<string, unknown> = {}
 
