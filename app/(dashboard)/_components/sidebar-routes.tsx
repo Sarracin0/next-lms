@@ -7,7 +7,7 @@ import {
   CalendarClock,
   Compass,
   LayoutDashboard,
-  Quilt,
+  KanbanSquare,
   ShieldQuestion,
   Users,
   Users2,
@@ -27,7 +27,7 @@ const learnerRoutes = [
 ]
 
 const managementRoutes = [
-  { icon: Quilt, label: 'Course Builder', href: '/manage/courses' },
+  { icon: KanbanSquare, label: 'Course Builder', href: '/manage/courses' },
   { icon: Users2, label: 'Team Management', href: '/manage/teams' },
   { icon: Activity, label: 'Engagement Analytics', href: '/manage/analytics' },
   { icon: ShieldQuestion, label: 'Badge Studio', href: '/manage/badges' },
