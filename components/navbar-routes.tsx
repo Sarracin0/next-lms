@@ -1,46 +1,44 @@
 'use client'
 
-import { UserButton, useAuth } from '@clerk/nextjs'
-import { usePathname } from 'next/navigation'
-import { LogOut } from 'lucide-react'
+import { UserButton } from '@clerk/nextjs'
+import { Briefcase, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+import { useDashboardContext } from '@/components/providers/dashboard-provider'
 
 import { Button } from '@/components/ui/button'
 import { SearchInput } from './search-input'
-import { isTeacher } from '@/lib/teacher'
 
 export const NavbarRoutes = () => {
-  const { userId } = useAuth()
-
+  const { profile } = useDashboardContext()
   const pathname = usePathname()
 
-  const isTeacherPage = pathname?.startsWith('/teacher')
-  const isCoursePage = pathname?.includes('/courses')
-  const isSearchPage = pathname?.includes('/search')
+  const isManageRoute = pathname?.startsWith('/manage') ?? false
+  const showSearch = !isManageRoute && (pathname?.startsWith('/library') || pathname === '/courses')
+  const canManage = profile.role === 'HR_ADMIN' || profile.role === 'TRAINER'
 
   return (
     <>
-      {isSearchPage && (
-        <div className="hidden md:block">
+      {showSearch ? (
+        <div className="hidden w-full max-w-xl md:block">
           <SearchInput />
         </div>
-      )}
-      <div className="ml-auto flex gap-x-2">
-        {isTeacherPage || isCoursePage ? (
-          <Link href="/">
-            <Button size="sm" variant="ghost">
-              <LogOut className="mr-2 h-4 w-4" />
-              Exit
-            </Button>
-          </Link>
-        ) : isTeacher(userId) ? (
-          <Link href="/teacher/courses">
-            <Button size="sm" variant="ghost">
-              Teacher mode
+      ) : null}
+      <div className="ml-auto flex items-center gap-x-2">
+        {canManage ? (
+          <Link href={isManageRoute ? '/courses' : '/manage/courses'}>
+            <Button size="sm" variant={isManageRoute ? 'outline' : 'default'} className="hidden items-center gap-2 md:inline-flex">
+              {isManageRoute ? <Plus className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />}
+              {isManageRoute ? 'New Course' : 'Manage Space'}
             </Button>
           </Link>
         ) : null}
-        <UserButton />
+        <div className="hidden flex-col items-end text-xs font-medium text-muted-foreground md:flex">
+          <span className="text-sm font-semibold text-foreground">{profile.points} pts</span>
+          <span>Streak: {profile.streakCount}</span>
+        </div>
+        <UserButton appearance={{ elements: { avatarBox: 'h-10 w-10 border border-muted-foreground/20' } }} />
       </div>
     </>
   )

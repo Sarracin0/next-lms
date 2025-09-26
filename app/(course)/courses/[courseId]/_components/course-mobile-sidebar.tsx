@@ -4,7 +4,12 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import CourseSidebar from './course-sidebar'
 
 type CourseMobileSidebarProps = {
-  course: Prisma.CourseGetPayload<{ include: { chapters: { include: { userProgress: true } } } }>
+  course: Prisma.CourseGetPayload<{
+    include: {
+      chapters: { include: { userProgress: true } }
+      enrollments: true
+    }
+  }>
   progressCount: number
 }
 

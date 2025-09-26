@@ -7,106 +7,426 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Course {
-  id          String  @id @default(cuid())
-  createdById String
-  title       String
+enum UserRole {
+  HR_ADMIN
+  TRAINER
+  LEARNER
+}
+
+enum TeamRole {
+  LEADER
+  MEMBER
+}
+
+enum PointsType {
+  COMPLETION
+  STREAK
+  BONUS
+  QUEST
+  MANUAL
+}
+
+enum BadgeType {
+  COMPLETION
+  STREAK
+  ENGAGEMENT
+  CUSTOM
+}
+
+enum LeaderboardScope {
+  COMPANY
+  TEAM
+  GLOBAL
+}
+
+enum LeaderboardPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ALL_TIME
+}
+
+enum QuestStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum QuestMissionType {
+  COURSE
+  CHAPTER
+  CUSTOM
+}
+
+enum QuestAssigneeType {
+  USER
+  TEAM
+}
+
+enum CourseEnrollmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum CourseEnrollmentSource {
+  MANUAL
+  TEAM
+  QUEST
+  SELF_ENROLL
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  clerkOrgId  String   @unique
+  name        String
+  slug        String   @unique
+  domain      String?
   description String?
-  imageUrl    String?
-  price       Float?
-  isPublished Boolean @default(false)
+  logoUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  attachments Attachment[]
-  category    Category?    @relation(fields: [categoryId], references: [id])
-  categoryId  String?
-  chapters    Chapter[]
-  purchases   Purchase[]
+  profiles     UserProfile[]
+  teams        CompanyTeam[]
+  courses      Course[]
+  categories   Category[]
+  badges       Badge[]
+  quests       Quest[]
+  leaderboards Leaderboard[]
+  liveSessions LiveSession[]
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model UserProfile {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  companyId    String
+  role         UserRole
+  jobTitle     String?
+  department   String?
+  avatarUrl    String?
+  bio          String?
+  timezone     String?
+  points       Int       @default(0)
+  streakCount  Int       @default(0)
+  lastActiveAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company                 Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  memberships             TeamMembership[]
+  teamsCreated            CompanyTeam[]          @relation("TeamCreatedBy")
+  createdCourses          Course[]               @relation("CourseCreatedBy")
+  enrollments             CourseEnrollment[]
+  enrollmentsAssigned     CourseEnrollment[]     @relation("CourseEnrollmentAssignedBy")
+  teamAssignmentsAssigned CourseTeamAssignment[] @relation("CourseTeamAssignmentAssignedBy")
+  progress                UserProgress[]
+  badges                  UserBadge[]
+  badgesAwarded           UserBadge[]            @relation("UserBadgeAwardedBy")
+  pointsLog               UserPoints[]
+  questsCreated           Quest[]                @relation("QuestCreatedBy")
+  questAssignments        QuestAssignment[]      @relation("QuestAssignmentAssignedBy")
+  questParticipations     QuestAssignment[]      @relation("QuestAssignmentUser")
+  liveSessionsHosted      LiveSession[]          @relation("LiveSessionHost")
+  leaderboardEntries      LeaderboardEntry[]     @relation("LeaderboardEntryUser")
+}
+
+model CompanyTeam {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  createdById String
+  points      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company            Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy          UserProfile            @relation("TeamCreatedBy", fields: [createdById], references: [id])
+  memberships        TeamMembership[]
+  courseAssignments  CourseTeamAssignment[]
+  leaderboardEntries LeaderboardEntry[]     @relation("LeaderboardEntryTeam")
+  questAssignments   QuestAssignment[]      @relation("QuestAssignmentTeam")
+}
+
+model TeamMembership {
+  id            String   @id @default(cuid())
+  teamId        String
+  userProfileId String
+  role          TeamRole @default(MEMBER)
+  joinedAt      DateTime @default(now())
+
+  team        CompanyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userProfileId])
 }
 
 model Category {
-  id      String   @id @default(cuid())
-  name    String   @unique
+  id        String  @id @default(cuid())
+  companyId String?
+  name      String
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   courses Course[]
+
+  @@unique([companyId, name])
+}
+
+model Course {
+  id                       String   @id @default(cuid())
+  companyId                String
+  createdByProfileId       String
+  title                    String
+  description              String?
+  imageUrl                 String?
+  isPublished              Boolean  @default(false)
+  estimatedDurationMinutes Int?
+  level                    String?
+  learningOutcomes         String?
+  prerequisites            String?
+  categoryId               String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy       UserProfile            @relation("CourseCreatedBy", fields: [createdByProfileId], references: [id])
+  category        Category?              @relation(fields: [categoryId], references: [id])
+  attachments     Attachment[]
+  chapters        Chapter[]
+  enrollments     CourseEnrollment[]
+  teamAssignments CourseTeamAssignment[]
+  liveSessions    LiveSession[]
+  missions        QuestMission[]
 }
 
 model Attachment {
-  id String @id @default(cuid())
-
-  name String
-  url  String
-
-  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  courseId String
-
+  id        String   @id @default(cuid())
+  courseId  String
+  name      String
+  url       String
+  type      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@index([courseId])
 }
 
 model Chapter {
-  id          String  @id @default(cuid())
-  title       String
-  description String?
-  videoUrl    String?
-  position    Int
-  isPublished Boolean @default(false)
-  isFree      Boolean @default(false)
+  id                       String   @id @default(cuid())
+  courseId                 String
+  title                    String
+  description              String?
+  position                 Int      @default(0)
+  estimatedDurationMinutes Int?
+  videoUrl                 String?
+  contentUrl               String?
+  isPublished              Boolean  @default(false)
+  isPreview                Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
-  course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  courseId     String
-  muxData      MuxData?
-  userProgress UserProgress[]
+  course   Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress UserProgress[]
+  missions QuestMission[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@index([courseId])
 }
 
-model MuxData {
-  id         String  @id @default(cuid())
-  assetId    String
-  playbackId String?
+model CourseEnrollment {
+  id            String                 @id @default(cuid())
+  courseId      String
+  userProfileId String
+  assignedById  String
+  source        CourseEnrollmentSource @default(MANUAL)
+  status        CourseEnrollmentStatus @default(NOT_STARTED)
+  dueDate       DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 
-  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  chapterId String  @unique
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  assignedBy  UserProfile @relation("CourseEnrollmentAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([courseId, userProfileId])
+}
+
+model CourseTeamAssignment {
+  id           String   @id @default(cuid())
+  courseId     String
+  teamId       String
+  assignedById String
+  assignedAt   DateTime @default(now())
+
+  course     Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  team       CompanyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  assignedBy UserProfile @relation("CourseTeamAssignmentAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([courseId, teamId])
 }
 
 model UserProgress {
-  id     String @id @default(cuid())
-  userId String
+  id            String    @id @default(cuid())
+  userProfileId String
+  chapterId     String
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  pointsAwarded Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  chapter     Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  chapterId   String
-  isCompleted Boolean @default(false)
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  chapter     Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, chapterId])
+  @@unique([userProfileId, chapterId])
 }
 
-model Purchase {
-  id     String @id @default(cuid())
-  userId String
+model Badge {
+  id           String    @id @default(cuid())
+  companyId    String?
+  name         String
+  description  String?
+  icon         String?
+  type         BadgeType
+  criteria     Json?
+  pointsReward Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  courseId String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, courseId])
+  company    Company?    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userBadges UserBadge[]
+  Quest      Quest[]
 }
 
-model StripeCustomer {
-  id String @id @default(cuid())
+model UserBadge {
+  id            String   @id @default(cuid())
+  userProfileId String
+  badgeId       String
+  awardedById   String?
+  awardedAt     DateTime @default(now())
+  context       String?
 
-  userid           String @unique
-  stripeCustomerId String @unique
+  userProfile UserProfile  @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  badge       Badge        @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  awardedBy   UserProfile? @relation("UserBadgeAwardedBy", fields: [awardedById], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@unique([userProfileId, badgeId])
+}
+
+model UserPoints {
+  id            String     @id @default(cuid())
+  userProfileId String
+  delta         Int
+  type          PointsType
+  reason        String?
+  referenceId   String?
+  createdAt     DateTime   @default(now())
+
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+}
+
+model Leaderboard {
+  id        String            @id @default(cuid())
+  companyId String
+  scope     LeaderboardScope
+  period    LeaderboardPeriod
+  startsAt  DateTime
+  endsAt    DateTime
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  company Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  entries LeaderboardEntry[]
+}
+
+model LeaderboardEntry {
+  id            String  @id @default(cuid())
+  leaderboardId String
+  teamId        String?
+  userProfileId String?
+  rank          Int
+  points        Int
+
+  leaderboard Leaderboard  @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+  team        CompanyTeam? @relation("LeaderboardEntryTeam", fields: [teamId], references: [id])
+  userProfile UserProfile? @relation("LeaderboardEntryUser", fields: [userProfileId], references: [id])
+}
+
+model Quest {
+  id           String      @id @default(cuid())
+  companyId    String
+  createdById  String
+  title        String
+  description  String?
+  status       QuestStatus @default(NOT_STARTED)
+  pointsReward Int         @default(0)
+  badgeId      String?
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   UserProfile       @relation("QuestCreatedBy", fields: [createdById], references: [id])
+  badge       Badge?            @relation(fields: [badgeId], references: [id])
+  missions    QuestMission[]
+  assignments QuestAssignment[]
+}
+
+model QuestMission {
+  id          String           @id @default(cuid())
+  questId     String
+  order       Int
+  type        QuestMissionType
+  courseId    String?
+  chapterId   String?
+  description String?
+
+  quest   Quest    @relation(fields: [questId], references: [id], onDelete: Cascade)
+  course  Course?  @relation(fields: [courseId], references: [id])
+  chapter Chapter? @relation(fields: [chapterId], references: [id])
+
+  @@unique([questId, order])
+}
+
+model QuestAssignment {
+  id            String            @id @default(cuid())
+  questId       String
+  assigneeType  QuestAssigneeType
+  teamId        String?
+  userProfileId String?
+  assignedById  String
+  status        QuestStatus       @default(NOT_STARTED)
+  progress      Int               @default(0)
+  assignedAt    DateTime          @default(now())
+  completedAt   DateTime?
+
+  quest       Quest        @relation(fields: [questId], references: [id], onDelete: Cascade)
+  team        CompanyTeam? @relation("QuestAssignmentTeam", fields: [teamId], references: [id])
+  userProfile UserProfile? @relation("QuestAssignmentUser", fields: [userProfileId], references: [id])
+  assignedBy  UserProfile  @relation("QuestAssignmentAssignedBy", fields: [assignedById], references: [id])
+}
+
+model LiveSession {
+  id              String   @id @default(cuid())
+  companyId       String
+  courseId        String
+  hostId          String
+  title           String
+  description     String?
+  scheduledFor    DateTime
+  durationMinutes Int?
+  meetingUrl      String?
+  recordingUrl    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  course  Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  host    UserProfile @relation("LiveSessionHost", fields: [hostId], references: [id])
 }

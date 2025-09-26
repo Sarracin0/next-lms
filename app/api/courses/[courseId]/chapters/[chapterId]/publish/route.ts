@@ -1,36 +1,51 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { UserRole } from '@prisma/client'
+import { logError } from '@/lib/logger'
+
 import { db } from '@/lib/db'
+import { requireAuthContext } from '@/lib/current-profile'
 
-type Params = Promise<{ chapterId: string; courseId: string }>
+type RouteParams = Promise<{
+  courseId: string
+  chapterId: string
+}>
 
-export async function PATCH(req: NextRequest, { params }: { params: Params }) {
+export async function PATCH(request: NextRequest, { params }: { params: RouteParams }) {
   try {
-    const { chapterId, courseId } = await params
-    const { userId } = await auth()
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const { courseId, chapterId } = await params
+    const { profile, company } = await requireAuthContext()
+
+    const course = await db.course.findFirst({
+      where: { id: courseId, companyId: company.id },
+      select: { createdByProfileId: true },
+    })
+
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
-    const ownCourse = await db.course.findUnique({ where: { id: courseId, createdById: userId } })
-    if (!ownCourse) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (profile.role === UserRole.TRAINER && course.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
     const chapter = await db.chapter.findUnique({ where: { id: chapterId, courseId } })
-    const muxData = await db.muxData.findUnique({ where: { chapterId } })
 
-    if (![chapter, muxData, chapter?.title, chapter?.description, chapter?.videoUrl].every(Boolean)) {
-      return new NextResponse('Missing required fields', { status: 400 })
+    if (!chapter) {
+      return new NextResponse('Chapter not found', { status: 404 })
+    }
+
+    if (!chapter.title || !chapter.description || (!chapter.videoUrl && !chapter.contentUrl)) {
+      return new NextResponse('Missing required content for publication', { status: 400 })
     }
 
     const publishedChapter = await db.chapter.update({
-      where: { id: chapterId, courseId },
+      where: { id: chapterId },
       data: { isPublished: true },
     })
 
     return NextResponse.json(publishedChapter)
-  } catch {
+  } catch (error) {
+    logError('CHAPTER_PUBLISH', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }

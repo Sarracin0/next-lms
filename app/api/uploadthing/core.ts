@@ -1,15 +1,15 @@
-import { auth } from '@clerk/nextjs/server'
 import { createUploadthing, type FileRouter } from 'uploadthing/next'
-import { isTeacher } from '@/lib/teacher'
+import { UserRole } from '@prisma/client'
+
+import { assertRole, requireAuthContext } from '@/lib/current-profile'
 
 const f = createUploadthing()
 
 const handleAuth = async () => {
-  const { userId } = await auth()
-  const isAuthorized = isTeacher(userId)
+  const context = await requireAuthContext()
+  assertRole(context.profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-  if (!userId || !isAuthorized) throw new Error('Unauthorized')
-  return { userId }
+  return { userId: context.userId, profileId: context.profile.id }
 }
 
 export const ourFileRouter = {

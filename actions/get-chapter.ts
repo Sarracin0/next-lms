@@ -1,59 +1,139 @@
-import { Attachment, Chapter } from '@prisma/client'
+import { CourseEnrollment, UserProgress as PrismaUserProgress } from '@prisma/client'
+
 import { db } from '@/lib/db'
 
 type GetChapterArgs = {
-  userId: string
+  userProfileId: string
+  companyId: string
   courseId: string
   chapterId: string
 }
 
-export async function getChapter({ userId, courseId, chapterId }: GetChapterArgs) {
+type ChapterAccessResponse = {
+  course: {
+    id: string
+    title: string
+    description: string | null
+    estimatedDurationMinutes: number | null
+    imageUrl: string | null
+  } | null
+  chapter: {
+    id: string
+    title: string
+    description: string | null
+    videoUrl: string | null
+    contentUrl: string | null
+    position: number
+    isPreview: boolean
+  } | null
+  attachments: { id: string; name: string; url: string; type: string | null }[] | null
+  nextChapter: { id: string; title: string; position: number } | null
+  userProgress: PrismaUserProgress | null
+  enrollment: CourseEnrollment | null
+  canAccessContent: boolean
+}
+
+export async function getChapter({ userProfileId, companyId, courseId, chapterId }: GetChapterArgs): Promise<ChapterAccessResponse> {
   try {
-    const purchase = await db.purchase.findUnique({ where: { userId_courseId: { userId, courseId } } })
-    const course = await db.course.findUnique({ where: { id: courseId, isPublished: true }, select: { price: true } })
-    const chapter = await db.chapter.findUnique({ where: { id: chapterId, isPublished: true } })
+    const course = await db.course.findFirst({
+      where: { id: courseId, companyId, isPublished: true },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        estimatedDurationMinutes: true,
+        imageUrl: true,
+      },
+    })
 
-    if (!chapter || !course) {
-      throw new Error('Chapter or course not found!')
+    if (!course) {
+      return {
+        course: null,
+        chapter: null,
+        attachments: null,
+        nextChapter: null,
+        userProgress: null,
+        enrollment: null,
+        canAccessContent: false,
+      }
     }
 
-    let muxData = null
-    let attachments: Attachment[] = []
-    let nextChapter: Chapter | null = null
+    const chapter = await db.chapter.findFirst({
+      where: { id: chapterId, courseId, isPublished: true },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        videoUrl: true,
+        contentUrl: true,
+        position: true,
+        isPreview: true,
+      },
+    })
 
-    if (purchase) {
-      attachments = await db.attachment.findMany({ where: { courseId } })
+    if (!chapter) {
+      return {
+        course,
+        chapter: null,
+        attachments: null,
+        nextChapter: null,
+        userProgress: null,
+        enrollment: null,
+        canAccessContent: false,
+      }
     }
 
-    if (chapter.isFree || purchase) {
-      muxData = await db.muxData.findUnique({ where: { chapterId } })
+    const enrollment = await db.courseEnrollment.findUnique({
+      where: {
+        courseId_userProfileId: {
+          courseId,
+          userProfileId,
+        },
+      },
+    })
 
-      nextChapter = await db.chapter.findFirst({
-        where: { courseId, isPublished: true, position: { gt: chapter.position } },
-        orderBy: { position: 'asc' },
-      })
-    }
+    const attachments = await db.attachment.findMany({
+      where: { courseId },
+      select: { id: true, name: true, url: true, type: true },
+      orderBy: { createdAt: 'asc' },
+    })
 
-    const userProgress = await db.userProgress.findUnique({ where: { userId_chapterId: { userId, chapterId } } })
+    const nextChapter = await db.chapter.findFirst({
+      where: { courseId, isPublished: true, position: { gt: chapter.position } },
+      select: { id: true, title: true, position: true },
+      orderBy: { position: 'asc' },
+    })
+
+    const userProgress = await db.userProgress.findUnique({
+      where: {
+        userProfileId_chapterId: {
+          userProfileId,
+          chapterId,
+        },
+      },
+    })
+
+    const canAccessContent = Boolean(enrollment || chapter.isPreview)
+    const visibleAttachments = enrollment ? attachments : []
 
     return {
-      chapter,
       course,
-      muxData,
-      attachments,
+      chapter,
+      attachments: visibleAttachments,
       nextChapter,
       userProgress,
-      purchase,
+      enrollment,
+      canAccessContent,
     }
   } catch {
     return {
-      chapter: null,
       course: null,
-      muxData: null,
+      chapter: null,
       attachments: null,
       nextChapter: null,
       userProgress: null,
-      purchase: null,
+      enrollment: null,
+      canAccessContent: false,
     }
   }
 }

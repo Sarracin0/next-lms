@@ -1,49 +1,79 @@
-import { Prisma } from '@prisma/client'
+import { CourseEnrollmentStatus, UserRole } from '@prisma/client'
+
 import { db } from '@/lib/db'
 
-type PurchaseWithCourse = Prisma.PurchaseGetPayload<{ include: { course: true } }>
-
-function groupByCourse(purchases: PurchaseWithCourse[]) {
-  const grouped: { [courseTitle: string]: number } = {}
-
-  purchases.forEach((purchase) => {
-    const courseTitle = purchase.course.title
-    if (!grouped[courseTitle]) {
-      grouped[courseTitle] = 0
-    }
-
-    grouped[courseTitle] += purchase.course.price!
-  })
-
-  return grouped
+type CourseAnalyticsDatum = {
+  name: string
+  completed: number
+  inProgress: number
 }
 
-export async function getAnalytics(userId: string) {
+type AnalyticsResponse = {
+  data: CourseAnalyticsDatum[]
+  totalLearners: number
+  completedEnrollments: number
+  inProgressEnrollments: number
+  averageCompletionRate: number
+}
+
+export async function getAnalytics(companyId: string): Promise<AnalyticsResponse> {
   try {
-    const purchases = await db.purchase.findMany({
-      where: { course: { createdById: userId } },
-      include: { course: true },
+    const [courseStats, totalLearners, enrollments, completedEnrollments] = await Promise.all([
+      db.course.findMany({
+        where: { companyId },
+        select: {
+          title: true,
+          enrollments: {
+            select: {
+              status: true,
+            },
+          },
+        },
+      }),
+      db.userProfile.count({ where: { companyId, role: UserRole.LEARNER } }),
+      db.courseEnrollment.count({ where: { course: { companyId } } }),
+      db.courseEnrollment.count({
+        where: {
+          course: { companyId },
+          status: CourseEnrollmentStatus.COMPLETED,
+        },
+      }),
+    ])
+
+    const inProgressEnrollments = await db.courseEnrollment.count({
+      where: {
+        course: { companyId },
+        status: CourseEnrollmentStatus.IN_PROGRESS,
+      },
     })
 
-    const groupedEarnings = groupByCourse(purchases)
-    const data = Object.entries(groupedEarnings).map(([courseTitle, total]) => ({
-      name: courseTitle,
-      total,
-    }))
+    const data: CourseAnalyticsDatum[] = courseStats.map((course) => {
+      const completed = course.enrollments.filter((enrollment) => enrollment.status === CourseEnrollmentStatus.COMPLETED).length
+      const inProgress = course.enrollments.filter((enrollment) => enrollment.status === CourseEnrollmentStatus.IN_PROGRESS).length
 
-    const totalRevenue = data.reduce((acc, curr) => acc + curr.total, 0)
-    const totalSales = purchases.length
+      return {
+        name: course.title,
+        completed,
+        inProgress,
+      }
+    })
+
+    const averageCompletionRate = enrollments === 0 ? 0 : Math.round((completedEnrollments / enrollments) * 100)
 
     return {
       data,
-      totalRevenue,
-      totalSales,
+      totalLearners,
+      completedEnrollments,
+      inProgressEnrollments,
+      averageCompletionRate,
     }
   } catch {
     return {
       data: [],
-      totalRevenue: 0,
-      totalSales: 0,
+      totalLearners: 0,
+      completedEnrollments: 0,
+      inProgressEnrollments: 0,
+      averageCompletionRate: 0,
     }
   }
 }

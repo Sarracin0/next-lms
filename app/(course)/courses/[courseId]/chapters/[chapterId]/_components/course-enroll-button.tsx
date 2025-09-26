@@ -1,26 +1,31 @@
 'use client'
 
+import axios from 'axios'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import axios from 'axios'
+
 import { Button } from '@/components/ui/button'
-import { formatPrice } from '@/lib/format'
 
 type CourseEnrollButtonProps = {
-  price: number
   courseId: string
+  userProfileId: string
 }
 
-export default function CourseEnrollButton({ price, courseId }: CourseEnrollButtonProps) {
+export default function CourseEnrollButton({ courseId, userProfileId }: CourseEnrollButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   const onClick = async () => {
     try {
       setIsLoading(true)
-      const response = await axios.post(`/api/courses/${courseId}/checkout`)
-      window.location.assign(response.data.url)
+      await axios.post(`/api/courses/${courseId}/enrollments`, {
+        userProfileIds: [userProfileId],
+      })
+      toast.success('You are now enrolled in this course')
+      router.refresh()
     } catch {
-      toast.error('Something went wrong!')
+      toast.error('Unable to enroll right now')
     } finally {
       setIsLoading(false)
     }
@@ -28,7 +33,7 @@ export default function CourseEnrollButton({ price, courseId }: CourseEnrollButt
 
   return (
     <Button className="w-full md:w-auto" size="sm" onClick={onClick} disabled={isLoading}>
-      Enroll for {formatPrice(price)}
+      Enroll now
     </Button>
   )
 }

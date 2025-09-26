@@ -21,6 +21,7 @@ export default function CourseSidebarItem({ id, label, isCompleted, courseId, is
   const isActive = pathname?.includes(id)
 
   const onClick = () => {
+    if (isLocked) return
     router.push(`/courses/${courseId}/chapters/${id}`)
   }
 
@@ -31,6 +32,7 @@ export default function CourseSidebarItem({ id, label, isCompleted, courseId, is
       className={cn(
         'flex items-center gap-x-2 pl-6 text-sm font-medium text-slate-500 transition-all hover:bg-slate-300/20 hover:text-slate-600',
         {
+          'cursor-not-allowed opacity-60 hover:bg-transparent hover:text-slate-500': isLocked,
           'bg-slate-200/20 text-slate-700 hover:bg-slate-200/20 hover:text-slate-700': isActive,
           'text-emerald-700 hover:text-emerald-700': isCompleted,
           'bg-emerald-200/20 ': isCompleted && isActive,

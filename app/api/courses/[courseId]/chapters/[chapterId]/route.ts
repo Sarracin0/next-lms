@@ -1,101 +1,91 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import Mux from '@mux/mux-node'
+import { UserRole } from '@prisma/client'
+import { logError } from '@/lib/logger'
+
 import { db } from '@/lib/db'
+import { assertRole, requireAuthContext } from '@/lib/current-profile'
 
-type Params = Promise<{ chapterId: string; courseId: string }>
+type RouteParams = Promise<{
+  courseId: string
+  chapterId: string
+}>
 
-const { Video } = new Mux(process.env.MUX_TOKEN_ID!, process.env.MUX_TOKEN_SECRET!)
-
-export async function PATCH(req: NextRequest, { params }: { params: Params }) {
+export async function PATCH(request: NextRequest, { params }: { params: RouteParams }) {
   try {
-    const resolvedParams = await params
-    const { userId } = await auth()
-    // eslint-disable-next-line
-    const { isPublished, ...values } = await req.json()
+    const { courseId, chapterId } = await params
+    const { profile, company } = await requireAuthContext()
+    assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const course = await db.course.findFirst({ where: { id: courseId, companyId: company.id } })
+
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
-    const ownCourse = await db.course.findUnique({ where: { id: resolvedParams.courseId, createdById: userId } })
-    if (!ownCourse) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (profile.role === UserRole.TRAINER && course.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const chapter = await db.chapter.update({ where: { id: resolvedParams.chapterId }, data: { ...values } })
+    const chapterRecord = await db.chapter.findFirst({ where: { id: chapterId, courseId } })
 
-    if (values.videoUrl) {
-      /** Cleaning up existing data */
-      const existingMuxData = await db.muxData.findFirst({ where: { chapterId: resolvedParams.chapterId } })
-      if (existingMuxData) {
-        await Video.Assets.del(existingMuxData.assetId)
-        await db.muxData.delete({ where: { id: existingMuxData.id } })
-      }
-
-      const asset = await Video.Assets.create({
-        input: values.videoUrl,
-        playback_policy: 'public',
-        test: false,
-      })
-
-      await db.muxData.create({
-        data: {
-          chapterId: resolvedParams.chapterId,
-          assetId: asset.id,
-          playbackId: asset.playback_ids?.[0]?.id,
-        },
-      })
+    if (!chapterRecord) {
+      return new NextResponse('Chapter not found', { status: 404 })
     }
+
+    const payload = await request.json()
+
+    const chapter = await db.chapter.update({
+      where: { id: chapterId },
+      data: {
+        title: payload.title,
+        description: payload.description,
+        videoUrl: payload.videoUrl,
+        contentUrl: payload.contentUrl,
+        isPublished: typeof payload.isPublished === 'boolean' ? payload.isPublished : undefined,
+        isPreview: typeof payload.isPreview === 'boolean' ? payload.isPreview : undefined,
+        position: typeof payload.position === 'number' ? payload.position : undefined,
+        estimatedDurationMinutes:
+          typeof payload.estimatedDurationMinutes === 'number' ? payload.estimatedDurationMinutes : undefined,
+      },
+    })
 
     return NextResponse.json(chapter)
-  } catch {
+  } catch (error) {
+    logError('CHAPTER_PATCH', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Params }) {
+export async function DELETE(request: NextRequest, { params }: { params: RouteParams }) {
   try {
-    const resolvedParams = await params
-    const { userId } = await auth()
+    const { courseId, chapterId } = await params
+    const { profile, company } = await requireAuthContext()
+    assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const course = await db.course.findFirst({ where: { id: courseId, companyId: company.id } })
+
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
-    const ownCourse = await db.course.findUnique({ where: { id: resolvedParams.courseId, createdById: userId } })
-    if (!ownCourse) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (profile.role === UserRole.TRAINER && course.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const chapter = await db.chapter.findUnique({
-      where: { id: resolvedParams.chapterId, courseId: resolvedParams.courseId },
-    })
-    if (!chapter) {
+    const deleted = await db.chapter.deleteMany({ where: { id: chapterId, courseId } })
+
+    if (deleted.count === 0) {
       return new NextResponse('Chapter not found', { status: 404 })
     }
 
-    if (chapter.videoUrl) {
-      const existingMuxData = await db.muxData.findFirst({ where: { chapterId: resolvedParams.chapterId } })
-
-      if (existingMuxData) {
-        await Video.Assets.del(existingMuxData.assetId)
-        await db.muxData.delete({ where: { id: existingMuxData.id } })
-      }
+    const publishedChapters = await db.chapter.count({ where: { courseId, isPublished: true } })
+    if (publishedChapters === 0) {
+      await db.course.update({ where: { id: courseId }, data: { isPublished: false } })
     }
 
-    const deletedChapter = await db.chapter.delete({ where: { id: resolvedParams.chapterId } })
-
-    const publishedChaptersInCourse = await db.chapter.count({
-      where: { courseId: resolvedParams.courseId, isPublished: true },
-    })
-
-    if (!publishedChaptersInCourse) {
-      await db.course.update({ where: { id: resolvedParams.courseId }, data: { isPublished: false } })
-    }
-
-    return NextResponse.json(deletedChapter)
-  } catch {
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    logError('CHAPTER_DELETE', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }

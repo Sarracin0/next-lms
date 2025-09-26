@@ -1,36 +1,34 @@
 import { Prisma } from '@prisma/client'
-import { redirect } from 'next/navigation'
-import { auth } from '@clerk/nextjs/server'
-import { db } from '@/lib/db'
-import CourseSidebarItem from './course-sidebar-item'
+
 import { CourseProgress } from '@/components/course-progress'
+import { requireAuthContext } from '@/lib/current-profile'
+
+import CourseSidebarItem from './course-sidebar-item'
 
 type CourseSidebarProps = {
-  course: Prisma.CourseGetPayload<{ include: { chapters: { include: { userProgress: true } } } }>
+  course: Prisma.CourseGetPayload<{
+    include: {
+      chapters: {
+        include: {
+          userProgress: true
+        }
+      }
+      enrollments: true
+    }
+  }>
   progressCount: number
 }
 
 export default async function CourseSidebar({ course, progressCount }: CourseSidebarProps) {
-  const { userId } = await auth()
+  const { profile } = await requireAuthContext()
 
-  if (!userId) {
-    return redirect('/')
-  }
-
-  const purchase = await db.purchase.findUnique({
-    where: {
-      userId_courseId: {
-        userId,
-        courseId: course.id,
-      },
-    },
-  })
+  const enrollment = course.enrollments.find((item) => item.userProfileId === profile.id)
 
   return (
     <div className="flex h-full flex-col overflow-y-auto border-r shadow-sm">
       <div className="flex flex-col border-b p-8">
         <h1 className="text-lg font-semibold">{course.title}</h1>
-        {purchase ? (
+        {enrollment ? (
           <div className="mt-10">
             <CourseProgress variant="success" value={progressCount} />
           </div>
@@ -44,7 +42,7 @@ export default async function CourseSidebar({ course, progressCount }: CourseSid
             label={chapter.title}
             isCompleted={!!chapter.userProgress?.[0]?.isCompleted}
             courseId={course.id}
-            isLocked={!chapter.isFree && !purchase}
+            isLocked={!chapter.isPreview && !enrollment}
           />
         ))}
       </div>

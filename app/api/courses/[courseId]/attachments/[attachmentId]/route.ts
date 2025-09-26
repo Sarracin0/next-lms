@@ -1,31 +1,42 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { isTeacher } from '@/lib/teacher'
+import { UserRole } from '@prisma/client'
+import { logError } from '@/lib/logger'
 
-type Attachment = Promise<{
+import { db } from '@/lib/db'
+import { assertRole, requireAuthContext } from '@/lib/current-profile'
+
+type RouteParams = Promise<{
   courseId: string
   attachmentId: string
 }>
 
-export async function DELETE(request: NextRequest, { params }: { params: Attachment }) {
+export async function DELETE(request: NextRequest, { params }: { params: RouteParams }) {
   try {
     const { courseId, attachmentId } = await params
-    const { userId } = await auth()
+    const { profile, company } = await requireAuthContext()
+    assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    if (!userId || !isTeacher(userId)) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const course = await db.course.findFirst({ where: { id: courseId, companyId: company.id } })
+
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
-    const courseOwner = await db.course.findUnique({ where: { id: courseId, createdById: userId } })
-    if (!courseOwner) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (profile.role === UserRole.TRAINER && course.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const attachment = await db.attachment.delete({ where: { courseId, id: attachmentId } })
+    const attachment = await db.attachment.findFirst({ where: { id: attachmentId, courseId } })
 
-    return NextResponse.json(attachment)
-  } catch {
+    if (!attachment) {
+      return new NextResponse('Attachment not found', { status: 404 })
+    }
+
+    await db.attachment.delete({ where: { id: attachment.id } })
+
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    logError('COURSE_ATTACHMENT_DELETE', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }

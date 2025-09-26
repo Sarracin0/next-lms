@@ -1,33 +1,31 @@
 'use client'
 
 import axios from 'axios'
-import MuxPlayer from '@mux/mux-player-react'
+import { Loader2, Lock } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'react-hot-toast'
-import { useRouter } from 'next/navigation'
-import { Loader2, Lock } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
 import { useConfettiStore } from '@/hooks/use-confetti'
 
 interface VideoPlayerProps {
-  playbackId: string
   courseId: string
   chapterId: string
   nextChapterId?: string
   isLocked: boolean
   completeOnEnd: boolean
   title: string
+  videoUrl?: string | null
 }
 
 export const VideoPlayer = ({
-  playbackId,
   courseId,
   chapterId,
   nextChapterId,
   isLocked,
   completeOnEnd,
   title,
+  videoUrl,
 }: VideoPlayerProps) => {
   const [isReady, setIsReady] = useState(false)
   const router = useRouter()
@@ -69,16 +67,22 @@ export const VideoPlayer = ({
           <p className="text-sm">This chapter is locked</p>
         </div>
       )}
-      {!isLocked && (
-        <MuxPlayer
+      {!isLocked && videoUrl ? (
+        <video
           title={title}
-          className={cn(!isReady && 'hidden')}
-          onCanPlay={() => setIsReady(true)}
-          onEnded={onEnd}
+          className="h-full w-full rounded-md"
+          controls
           autoPlay
-          playbackId={playbackId}
+          onLoadedData={() => setIsReady(true)}
+          onEnded={onEnd}
+          src={videoUrl}
         />
-      )}
+      ) : null}
+      {!isLocked && !videoUrl ? (
+        <div className="flex h-full items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-100 text-sm text-muted-foreground">
+          Lesson video will appear here once uploaded.
+        </div>
+      ) : null}
     </div>
   )
 }

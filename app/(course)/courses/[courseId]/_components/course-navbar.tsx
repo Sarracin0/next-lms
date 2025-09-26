@@ -3,7 +3,12 @@ import CourseMobileSidebar from './course-mobile-sidebar'
 import { NavbarRoutes } from '@/components/navbar-routes'
 
 type CourseNavbarProps = {
-  course: Prisma.CourseGetPayload<{ include: { chapters: { include: { userProgress: true } } } }>
+  course: Prisma.CourseGetPayload<{
+    include: {
+      chapters: { include: { userProgress: true } }
+      enrollments: true
+    }
+  }>
   progressCount: number
 }
 

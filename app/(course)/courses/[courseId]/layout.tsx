@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation'
-import { auth } from '@clerk/nextjs/server'
+
+import { getProgress } from '@/actions/get-progress'
 import { db } from '@/lib/db'
+import { requireAuthContext } from '@/lib/current-profile'
+
 import CourseNavbar from './_components/course-navbar'
 import CourseSidebar from './_components/course-sidebar'
-import { getProgress } from '@/actions/get-progress'
 
 type CourseLayoutProps = {
   children: React.ReactNode
@@ -11,28 +13,29 @@ type CourseLayoutProps = {
 }
 
 export default async function CourseLayout({ children, params }: CourseLayoutProps) {
-  const { userId } = await auth()
-  if (!userId) {
-    return redirect('/')
-  }
+  const { profile, company } = await requireAuthContext()
   const resolvedParams = await params
 
-  const course = await db.course.findUnique({
-    where: { id: await resolvedParams.courseId },
+  const course = await db.course.findFirst({
+    where: { id: resolvedParams.courseId, companyId: company.id },
     include: {
       chapters: {
         where: { isPublished: true },
-        include: { userProgress: { where: { userId } } },
+        include: { userProgress: { where: { userProfileId: profile.id } } },
         orderBy: { position: 'asc' },
+      },
+      enrollments: {
+        where: { userProfileId: profile.id },
+        select: { id: true, status: true, userProfileId: true },
       },
     },
   })
 
   if (!course) {
-    return redirect('/')
+    return redirect('/courses')
   }
 
-  const progressCount = await getProgress(userId, course.id)
+  const progressCount = await getProgress(profile.id, course.id)
 
   return (
     <div className="h-full">

@@ -1,30 +1,44 @@
-import { CourseWithProgressAndCategory } from '@/actions/get-courses'
+import type { CourseEnrollmentStatus } from '@prisma/client'
+
 import CourseCard from './course-card'
 
-type CoursesListProps = {
-  items: CourseWithProgressAndCategory[]
+type CourseListItem = {
+  id: string
+  title: string
+  imageUrl?: string | null
+  chapters?: { id: string }[]
+  category?: { name: string | null } | null
+  progress: number | null
+  enrollmentStatus?: CourseEnrollmentStatus | null
 }
 
-export default function CoursesList({ items }: CoursesListProps) {
+type CoursesListProps = {
+  items: CourseListItem[]
+  emptyState?: string
+}
+
+export default function CoursesList({ items, emptyState }: CoursesListProps) {
   return (
     <div>
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {items.map((course) => (
           <CourseCard
             key={course.id}
             id={course.id}
             title={course.title}
-            imageUrl={course.imageUrl!}
-            price={course.price!}
+            imageUrl={course.imageUrl}
             progress={course.progress}
-            chaptersLength={course.chapters.length}
-            category={course?.category?.name ?? ''}
+            status={course.enrollmentStatus}
+            chaptersLength={course.chapters?.length ?? 0}
+            category={course?.category?.name ?? undefined}
           />
         ))}
       </div>
 
       {items.length === 0 ? (
-        <div className="mt-10 text-center text-sm text-muted-foreground">No courses found!</div>
+        <div className="mt-10 text-center text-sm text-muted-foreground">
+          {emptyState ?? 'No courses to show yet.'}
+        </div>
       ) : null}
     </div>
   )

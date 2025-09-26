@@ -1,36 +1,43 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { UserRole } from '@prisma/client'
+import { logError } from '@/lib/logger'
+
 import { db } from '@/lib/db'
+import { requireAuthContext } from '@/lib/current-profile'
 
-type Params = Promise<{ chapterId: string; courseId: string }>
+type RouteParams = Promise<{
+  courseId: string
+  chapterId: string
+}>
 
-export async function PATCH(req: NextRequest, { params }: { params: Params }) {
+export async function PATCH(request: NextRequest, { params }: { params: RouteParams }) {
   try {
-    const resolvedParams = await params
-    const { userId } = await auth()
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const { courseId, chapterId } = await params
+    const { profile, company } = await requireAuthContext()
+
+    const course = await db.course.findFirst({ where: { id: courseId, companyId: company.id } })
+
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
-    const ownCourse = await db.course.findUnique({ where: { id: resolvedParams.courseId, createdById: userId } })
-    if (!ownCourse) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (profile.role === UserRole.TRAINER && course.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const unpublishedChapter = await db.chapter.update({
-      where: { id: resolvedParams.chapterId, courseId: resolvedParams.courseId },
+    const chapter = await db.chapter.update({
+      where: { id: chapterId },
       data: { isPublished: false },
     })
 
-    const publishedChapters = await db.chapter.count({
-      where: { courseId: resolvedParams.courseId, isPublished: true },
-    })
-    if (!publishedChapters) {
-      await db.course.update({ where: { id: resolvedParams.courseId }, data: { isPublished: false } })
+    const publishedChapters = await db.chapter.count({ where: { courseId, isPublished: true } })
+    if (publishedChapters === 0) {
+      await db.course.update({ where: { id: courseId }, data: { isPublished: false } })
     }
 
-    return NextResponse.json(unpublishedChapter)
-  } catch {
+    return NextResponse.json(chapter)
+  } catch (error) {
+    logError('CHAPTER_UNPUBLISH', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }

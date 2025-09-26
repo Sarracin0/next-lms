@@ -1,39 +1,58 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { UserRole } from '@prisma/client'
+import { logError } from '@/lib/logger'
+
 import { db } from '@/lib/db'
-import { isTeacher } from '@/lib/teacher'
+import { assertRole, requireAuthContext } from '@/lib/current-profile'
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ courseId: string }> }) {
+type RouteParams = Promise<{
+  courseId: string
+}>
+
+export async function POST(request: NextRequest, { params }: { params: RouteParams }) {
   try {
-    const resolvedParams = await params
-    const { userId } = await auth()
-    const { title } = await req.json()
+    const { courseId } = await params
+    const { profile, company } = await requireAuthContext()
+    assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    if (!userId || !isTeacher(userId)) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const { title, estimatedDurationMinutes } = await request.json()
+
+    if (!title) {
+      return new NextResponse('Chapter title is required', { status: 400 })
     }
 
-    const courseOwner = await db.course.findUnique({
-      where: { id: resolvedParams.courseId, createdById: userId },
+    const course = await db.course.findFirst({
+      where: { id: courseId, companyId: company.id },
     })
 
-    if (!courseOwner) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 })
+    }
+
+    if (profile.role === UserRole.TRAINER && course.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
     const lastChapter = await db.chapter.findFirst({
-      where: { courseId: resolvedParams.courseId },
+      where: { courseId },
       orderBy: { position: 'desc' },
     })
 
     const newPosition = lastChapter ? lastChapter.position + 1 : 1
 
-    const newChapter = await db.chapter.create({
-      data: { title, courseId: resolvedParams.courseId, position: newPosition },
+    const chapter = await db.chapter.create({
+      data: {
+        title,
+        courseId,
+        position: newPosition,
+        estimatedDurationMinutes:
+          typeof estimatedDurationMinutes === 'number' ? estimatedDurationMinutes : null,
+      },
     })
 
-    return NextResponse.json(newChapter)
-  } catch {
+    return NextResponse.json(chapter, { status: 201 })
+  } catch (error) {
+    logError('COURSE_CHAPTER_POST', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }

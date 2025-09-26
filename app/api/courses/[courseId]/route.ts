@@ -1,73 +1,84 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import Mux from '@mux/mux-node'
+import { UserRole } from '@prisma/client'
+import { logError } from '@/lib/logger'
+
 import { db } from '@/lib/db'
-import { isTeacher } from '@/lib/teacher'
+import { assertRole, requireAuthContext } from '@/lib/current-profile'
 
-const { Video } = new Mux(process.env.MUX_TOKEN_ID!, process.env.MUX_TOKEN_SECRET!)
+type RouteParams = Promise<{
+  courseId: string
+}>
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ courseId: string }> }) {
+export async function PATCH(request: NextRequest, { params }: { params: RouteParams }) {
   try {
-    const { userId } = await auth()
-    const { courseId } = await params
-    const values = await req.json()
+    const { profile, company } = await requireAuthContext()
+    assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    if (!userId || !isTeacher(userId)) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const { courseId } = await params
+    const existingCourse = await db.course.findFirst({ where: { id: courseId, companyId: company.id } })
+
+    if (!existingCourse) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
-    const course = await db.course.update({
-      where: {
-        id: courseId,
-        createdById: userId,
-      },
+    if (profile.role === UserRole.TRAINER && existingCourse.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+
+    const {
+      title,
+      description,
+      imageUrl,
+      categoryId,
+      estimatedDurationMinutes,
+      level,
+      learningOutcomes,
+      prerequisites,
+    } = await request.json()
+
+    const updatedCourse = await db.course.update({
+      where: { id: courseId },
       data: {
-        title: values?.title,
-        description: values?.description,
-        imageUrl: values?.imageUrl,
-        categoryId: values?.categoryId,
-        price: values?.price,
-        attachments: values?.attachments,
+        title,
+        description,
+        imageUrl,
+        categoryId: categoryId ? categoryId : null,
+        estimatedDurationMinutes: typeof estimatedDurationMinutes === 'number' ? estimatedDurationMinutes : null,
+        level,
+        learningOutcomes,
+        prerequisites,
       },
     })
 
-    return NextResponse.json(course)
-  } catch {
-    return new NextResponse('Internal Error', { status: 500 })
+    return NextResponse.json(updatedCourse)
+  } catch (error) {
+    logError('COURSE_PATCH', error)
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ courseId: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: RouteParams }) {
   try {
+    const { profile, company } = await requireAuthContext()
+    assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
+
     const { courseId } = await params
-    const { userId } = await auth()
 
-    if (!userId || !isTeacher(userId)) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const existingCourse = await db.course.findFirst({ where: { id: courseId, companyId: company.id } })
+
+    if (!existingCourse) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
-    const course = await db.course.findUnique({
-      where: { id: courseId, createdById: userId },
-      include: {
-        chapters: { include: { muxData: true } },
-      },
-    })
-
-    if (!course) {
-      return new NextResponse('Not found', { status: 404 })
+    if (profile.role === UserRole.TRAINER && existingCourse.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
-    /** Removing mux data for all chapters */
-    for (const chapter of course.chapters) {
-      if (chapter.muxData) {
-        await Video.Assets.del(chapter.muxData.assetId)
-      }
-    }
+    await db.course.delete({ where: { id: courseId } })
 
-    const deletedCourse = await db.course.delete({ where: { id: courseId } })
-
-    return NextResponse.json(deletedCourse)
-  } catch {
-    return new NextResponse('Internal server exception', { status: 500 })
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    logError('COURSE_DELETE', error)
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 }

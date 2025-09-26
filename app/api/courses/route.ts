@@ -1,26 +1,33 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { UserRole } from '@prisma/client'
+import { logError } from '@/lib/logger'
+
 import { db } from '@/lib/db'
-import { isTeacher } from '@/lib/teacher'
+import { assertRole, requireAuthContext } from '@/lib/current-profile'
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
-    const { title } = await request.json()
+    const { profile, company } = await requireAuthContext()
+    assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    if (!userId || !isTeacher(userId)) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const { title, categoryId } = await request.json()
+
+    if (!title) {
+      return new NextResponse('Title is required', { status: 400 })
     }
 
     const course = await db.course.create({
       data: {
         title,
-        createdById: userId,
+        companyId: company.id,
+        createdByProfileId: profile.id,
+        categoryId: categoryId ?? null,
       },
     })
 
-    return NextResponse.json(course)
-  } catch {
+    return NextResponse.json(course, { status: 201 })
+  } catch (error) {
+    logError('COURSES_POST', error)
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }

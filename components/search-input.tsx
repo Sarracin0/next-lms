@@ -9,14 +9,15 @@ import { Input } from '@/components/ui/input'
 import { useDebounce } from '@/hooks/use-debounce'
 
 export const SearchInput = () => {
-  const [value, setValue] = useState('')
-  const debouncedValue = useDebounce(value)
-
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
 
   const currentCategoryId = searchParams.get('categoryId')
+  const initialTitle = searchParams.get('title') ?? ''
+
+  const [value, setValue] = useState(initialTitle)
+  const debouncedValue = useDebounce(value)
 
   useEffect(() => {
     const url = qs.stringifyUrl(

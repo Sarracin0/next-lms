@@ -1,32 +1,48 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { UserRole } from '@prisma/client'
+import { logError } from '@/lib/logger'
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ courseId: string }> }) {
+import { db } from '@/lib/db'
+import { assertRole, requireAuthContext } from '@/lib/current-profile'
+
+type RouteParams = Promise<{
+  courseId: string
+}>
+
+export async function PUT(request: NextRequest, { params }: { params: RouteParams }) {
   try {
     const { courseId } = await params
-    const { userId } = await auth()
+    const { profile, company } = await requireAuthContext()
+    assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const { list } = await request.json()
+
+    if (!Array.isArray(list)) {
+      return new NextResponse('Invalid payload', { status: 400 })
     }
 
-    const { list } = await req.json()
-    const courseOwner = await db.course.findUnique({ where: { id: courseId, createdById: userId } })
+    const course = await db.course.findFirst({ where: { id: courseId, companyId: company.id } })
 
-    if (!courseOwner) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
-    for (const item of list) {
-      await db.chapter.update({
-        where: { id: item.id },
-        data: { position: item.position },
-      })
+    if (profile.role === UserRole.TRAINER && course.createdByProfileId !== profile.id) {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
-    return new NextResponse('Success', { status: 200 })
-  } catch {
+    await Promise.all(
+      list.map((item: { id: string; position: number }) =>
+        db.chapter.updateMany({
+          where: { id: item.id, courseId },
+          data: { position: item.position },
+        }),
+      ),
+    )
+
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    logError('CHAPTER_REORDER', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }
