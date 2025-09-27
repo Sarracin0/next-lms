@@ -24,7 +24,7 @@ const Logo = () => {
       )}
       <div className="flex flex-col">
         <span className="text-sm font-semibold text-foreground">{company.name}</span>
-        <span className="text-xs text-muted-foreground">Corporate Learning Hub</span>
+        <span className="text-xs text-muted-foreground">Relax and follow the flow</span>
       </div>
     </div>
   )

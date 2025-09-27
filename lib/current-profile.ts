@@ -90,7 +90,15 @@ export async function getCurrentAuthContext() {
   }
 
   const membership = getMembershipForOrganization(user?.organizationMemberships, organizationId)
-  const organizationName = membership?.organization?.name ?? 'Company'
+
+  // 🔍 DEBUG: Verifica cosa arriva da Clerk
+  console.log('🔍 DEBUG - Dati Clerk raw:')
+  console.log('- organizationId:', organizationId)
+  console.log('- user?.organizationMemberships:', JSON.stringify(user?.organizationMemberships, null, 2))
+  console.log('- membership trovata:', JSON.stringify(membership, null, 2))
+  console.log('- organizationName estratto:', membership?.organization?.name)
+
+  const organizationName = membership?.organization?.name ?? 'Kimpy'
   const initialSlug = generateCompanySlug(membership?.organization?.slug ?? organizationName)
 
   let company = await db.company.findUnique({ where: { clerkOrgId: organizationId } })
@@ -118,6 +126,30 @@ export async function getCurrentAuthContext() {
       } else {
         throw error
       }
+    }
+  } else {
+    // ✅ FIX: Aggiorna i dati della company se sono cambiati in Clerk
+    const companyUpdates: Record<string, unknown> = {}
+
+    if (company.name !== organizationName) {
+      companyUpdates.name = organizationName
+    }
+
+    if (membership?.organization?.imageUrl && company.logoUrl !== membership.organization.imageUrl) {
+      companyUpdates.logoUrl = membership.organization.imageUrl
+    }
+
+    const currentDomain = (membership?.organization?.publicMetadata?.domain as string | undefined) ?? null
+    if (company.domain !== currentDomain) {
+      companyUpdates.domain = currentDomain
+    }
+
+    // Aggiorna solo se ci sono cambiamenti
+    if (Object.keys(companyUpdates).length > 0) {
+      company = await db.company.update({
+        where: { id: company.id },
+        data: companyUpdates,
+      })
     }
   }
 
