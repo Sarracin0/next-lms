@@ -6,7 +6,7 @@ import CourseSidebar from './course-sidebar'
 type CourseMobileSidebarProps = {
   course: Prisma.CourseGetPayload<{
     include: {
-      chapters: { include: { userProgress: true } }
+      chapters: { include: { progress: true, attachments: true } }
       enrollments: true
     }
   }>

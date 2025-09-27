@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { UserRole } from '@prisma/client'
+import { CourseEnrollmentSource, UserRole } from '@prisma/client'
 import { logError } from '@/lib/logger'
 
 import { db } from '@/lib/db'
@@ -22,6 +22,16 @@ export async function POST(request: NextRequest) {
         companyId: company.id,
         createdByProfileId: profile.id,
         categoryId: categoryId ?? null,
+        enrollments: {
+          create: {
+            userProfileId: profile.id,
+            assignedById: profile.id,
+            source: CourseEnrollmentSource.MANUAL,
+          },
+        },
+      },
+      include: {
+        enrollments: true,
       },
     })
 

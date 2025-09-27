@@ -33,6 +33,12 @@ export type CourseBuilderWizardProps = {
     total: number
     text: string
     isComplete: boolean
+    items: Array<{
+      id: string
+      label: string
+      helper?: string
+      isComplete: boolean
+    }>
   }
 }
 
@@ -101,7 +107,7 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
   const hasChapters = course.chapters.length > 0
   const hasLessonMedia = course.chapters.some((chapter) => chapter.videoUrl || chapter.contentUrl)
   const courseResources = course.attachments.filter((attachment) => attachment.chapterId == null)
-  const hasResources = courseResources.length > 0
+  const hasResources = course.attachments.length > 0
 
   const stepStates = useMemo<StepState[]>(() => {
     const completionMap: Record<StepId, boolean> = {
@@ -274,7 +280,7 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold">Readiness checklist</CardTitle>
                 <CardDescription>
-                  All mandatory items must be complete before publishing. Optional items help boost engagement.
+                  Publishing is available at any time—these checkpoints simply help you deliver a polished experience.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -295,7 +301,7 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
                 })}
               </CardContent>
               <CardFooter className="flex flex-col gap-3 pt-0 md:flex-row md:items-center md:justify-between">
-                <Actions disabled={!completion.isComplete} courseId={courseId} isPublished={course.isPublished} />
+                <Actions disabled={false} courseId={courseId} isPublished={course.isPublished} />
                 <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                   <span>Next: assign to teams</span>
                   <Button size="sm" variant="outline" asChild>
@@ -344,6 +350,23 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
           <div className="flex items-center gap-3">
             <Progress value={progressPercentage} variant={completion.isComplete ? 'success' : 'default'} className="h-2 flex-1" />
             <span className="text-xs font-medium text-muted-foreground">{progressPercentage}%</span>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              You can publish whenever you&apos;re ready. These checkpoints are optional best practices.
+            </p>
+            <div className="space-y-1.5">
+              {completion.items.map((item) => {
+                const Icon = item.isComplete ? CheckCircle2 : Circle
+                return (
+                  <div key={item.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Icon className={cn('h-3.5 w-3.5', item.isComplete ? 'text-emerald-600' : 'text-muted-foreground')} />
+                    <span className="font-medium text-foreground">{item.label}</span>
+                    {item.helper ? <span className="text-[11px] text-muted-foreground">— {item.helper}</span> : null}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>

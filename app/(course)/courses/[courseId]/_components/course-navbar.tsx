@@ -5,7 +5,7 @@ import { NavbarRoutes } from '@/components/navbar-routes'
 type CourseNavbarProps = {
   course: Prisma.CourseGetPayload<{
     include: {
-      chapters: { include: { userProgress: true } }
+      chapters: { include: { progress: true, attachments: true } }
       enrollments: true
     }
   }>

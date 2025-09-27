@@ -34,15 +34,41 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
 
   const hasPublishedChapter = course.chapters.some((chapter) => chapter.isPublished)
   const hasLessonMedia = course.chapters.some((chapter) => chapter.videoUrl || chapter.contentUrl)
+  const hasSupportingResources = course.attachments.length > 0
 
-  const requirements = [course.title, course.description, hasPublishedChapter, hasLessonMedia]
+  const recommended = [
+    {
+      id: 'basics',
+      label: 'Course basics saved',
+      helper: 'Title and overview added',
+      isComplete: Boolean(course.title && course.description),
+    },
+    {
+      id: 'lessons',
+      label: 'At least one lesson published',
+      helper: 'Keep lessons as drafts until ready',
+      isComplete: hasPublishedChapter,
+    },
+    {
+      id: 'media',
+      label: 'Lesson media added',
+      helper: 'Upload or link a video',
+      isComplete: hasLessonMedia,
+    },
+    {
+      id: 'resources',
+      label: 'Supporting resources attached',
+      helper: 'Optional slides, PDFs or links',
+      isComplete: hasSupportingResources,
+    },
+  ]
 
-  const totalFields = requirements.length
-  const completedFields = requirements.filter(Boolean).length
+  const totalFields = recommended.length
+  const completedFields = recommended.filter((item) => item.isComplete).length
 
   const completionText = `(${completedFields}/${totalFields})`
 
-  const isComplete = requirements.every(Boolean)
+  const isComplete = completedFields === totalFields
 
   return (
     <>
@@ -56,6 +82,7 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
             total: totalFields,
             text: completionText,
             isComplete,
+            items: recommended,
           }}
         />
       </div>

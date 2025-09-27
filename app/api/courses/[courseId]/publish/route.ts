@@ -30,13 +30,6 @@ export async function PATCH(request: NextRequest, { params }: { params: RoutePar
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const hasPublishedChapter = course.chapters.some((chapter) => chapter.isPublished)
-    const hasLessonMedia = course.chapters.some((chapter) => chapter.videoUrl || chapter.contentUrl)
-
-    if (!course.title || !course.description || !hasPublishedChapter || !hasLessonMedia) {
-      return new NextResponse('Missing required fields', { status: 400 })
-    }
-
     const publishedCourse = await db.course.update({
       where: { id: courseId },
       data: { isPublished: true },

@@ -10,7 +10,7 @@ type CourseSidebarProps = {
     include: {
       chapters: {
         include: {
-          userProgress: true
+          progress: true
         }
       }
       enrollments: true
@@ -40,7 +40,7 @@ export default async function CourseSidebar({ course, progressCount }: CourseSid
             key={chapter.id}
             id={chapter.id}
             label={chapter.title}
-            isCompleted={!!chapter.userProgress?.[0]?.isCompleted}
+            isCompleted={!!chapter.progress?.[0]?.isCompleted}
             courseId={course.id}
             isLocked={!chapter.isPreview && !enrollment}
           />

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getProgress } from '@/actions/get-progress'
 import { db } from '@/lib/db'
 import { requireAuthContext } from '@/lib/current-profile'
+import { DashboardProvider } from '@/components/providers/dashboard-provider'
 
 import CourseNavbar from './_components/course-navbar'
 import CourseSidebar from './_components/course-sidebar'
@@ -13,7 +14,8 @@ type CourseLayoutProps = {
 }
 
 export default async function CourseLayout({ children, params }: CourseLayoutProps) {
-  const { profile, company } = await requireAuthContext()
+  const context = await requireAuthContext()
+  const { profile, company, organizationId } = context
   const resolvedParams = await params
 
   const course = await db.course.findFirst({
@@ -21,7 +23,10 @@ export default async function CourseLayout({ children, params }: CourseLayoutPro
     include: {
       chapters: {
         where: { isPublished: true },
-        include: { userProgress: { where: { userProfileId: profile.id } } },
+        include: {
+          progress: { where: { userProfileId: profile.id } },
+          attachments: true,
+        },
         orderBy: { position: 'asc' },
       },
       enrollments: {
@@ -38,16 +43,37 @@ export default async function CourseLayout({ children, params }: CourseLayoutPro
   const progressCount = await getProgress(profile.id, course.id)
 
   return (
-    <div className="h-full">
-      <div className="fixed inset-y-0 z-50 h-20 w-full md:pl-80">
-        <CourseNavbar course={course} progressCount={progressCount} />
-      </div>
+    <DashboardProvider
+      value={{
+        profile: {
+          id: profile.id,
+          role: profile.role,
+          jobTitle: profile.jobTitle,
+          department: profile.department,
+          points: profile.points,
+          streakCount: profile.streakCount,
+          avatarUrl: profile.avatarUrl,
+        },
+        company: {
+          id: company.id,
+          name: company.name,
+          slug: company.slug,
+          logoUrl: company.logoUrl,
+        },
+        organizationId,
+      }}
+    >
+      <div className="h-full">
+        <div className="fixed inset-y-0 z-50 h-20 w-full md:pl-80">
+          <CourseNavbar course={course} progressCount={progressCount} />
+        </div>
 
-      <div className="fixed inset-y-0 z-50 hidden h-full w-80 flex-col md:flex">
-        <CourseSidebar course={course} progressCount={progressCount} />
-      </div>
+        <div className="fixed inset-y-0 z-50 hidden h-full w-80 flex-col md:flex">
+          <CourseSidebar course={course} progressCount={progressCount} />
+        </div>
 
-      <main className="h-full pt-20 md:pl-80">{children}</main>
-    </div>
+        <main className="h-full pt-20 md:pl-80">{children}</main>
+      </div>
+    </DashboardProvider>
   )
 }

@@ -9,14 +9,15 @@ import { requireAuthContext } from '@/lib/current-profile'
 import { Categories } from './_components/category'
 
 type LibraryPageProps = {
-  searchParams?: {
+  searchParams: Promise<{
     title?: string
     categoryId?: string
-  }
+  }>
 }
 
 const LibraryPage = async ({ searchParams }: LibraryPageProps) => {
   const context = await requireAuthContext()
+  const resolvedSearchParams = await searchParams
 
   if (!context.organizationId) {
     return redirect('/onboarding')
@@ -32,8 +33,8 @@ const LibraryPage = async ({ searchParams }: LibraryPageProps) => {
   const courses = await getCourses({
     userProfileId: context.profile.id,
     companyId: context.company.id,
-    title: searchParams?.title,
-    categoryId: searchParams?.categoryId,
+    title: resolvedSearchParams?.title,
+    categoryId: resolvedSearchParams?.categoryId,
   })
 
   return (
