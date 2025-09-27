@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { Attachment, Chapter, Course } from '@prisma/client'
 import {
@@ -16,14 +16,44 @@ import {
 } from 'lucide-react'
 
 import Actions from './actions'
-import { ChaptersForm } from './chapters-form'
 import { AttachmentForm } from './attachment-form'
 import CourseBasicsForm from './course-basics-form'
+import { CurriculumManager } from './curriculum-manager'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
+
+// Types for the new hierarchical structure
+export type Module = {
+  id: string
+  title: string
+  description?: string
+  position: number
+  isPublished: boolean
+  lessons: Lesson[]
+}
+
+export type Lesson = {
+  id: string
+  title: string
+  description?: string
+  position: number
+  isPublished: boolean
+  blocks: LessonBlock[]
+}
+
+export type LessonBlock = {
+  id: string
+  type: 'VIDEO_LESSON' | 'RESOURCES'
+  title: string
+  content?: string
+  videoUrl?: string
+  contentUrl?: string
+  position: number
+  isPublished: boolean
+}
 
 export type CourseBuilderWizardProps = {
   course: Course & { attachments: Attachment[]; chapters: Chapter[] }
@@ -103,24 +133,30 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
   const pathname = usePathname()
   const router = useRouter()
 
+  // State for the new hierarchical structure
+  const [modules, setModules] = useState<Module[]>([])
+
   const basicsComplete = Boolean(course.title && course.description)
-  const hasChapters = course.chapters.length > 0
-  const hasLessonMedia = course.chapters.some((chapter) => chapter.videoUrl || chapter.contentUrl)
+  const hasModules = modules.length > 0
+  const hasLessons = modules.some((module) => module.lessons.length > 0)
+  const hasBlocks = modules.some((module) =>
+    module.lessons.some((lesson) => lesson.blocks.length > 0)
+  )
   const courseResources = course.attachments.filter((attachment) => attachment.chapterId == null)
   const hasResources = course.attachments.length > 0
 
   const stepStates = useMemo<StepState[]>(() => {
     const completionMap: Record<StepId, boolean> = {
       basics: basicsComplete,
-      curriculum: hasChapters,
+      curriculum: hasModules && hasLessons && hasBlocks,
       resources: hasResources,
-      launch: hasChapters && hasLessonMedia,
+      launch: hasModules && hasLessons && hasBlocks,
     }
 
     return stepDefinitions.map((definition) => {
       const isComplete = completionMap[definition.id]
       const isLocked =
-        definition.id === 'launch' && (!basicsComplete || !hasChapters || !hasLessonMedia)
+        definition.id === 'launch' && (!basicsComplete || !hasModules || !hasLessons || !hasBlocks)
 
       return {
         ...definition,
@@ -128,7 +164,7 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
         isLocked,
       }
     })
-  }, [basicsComplete, hasChapters, hasLessonMedia, hasResources])
+  }, [basicsComplete, hasModules, hasLessons, hasBlocks, hasResources])
 
   const defaultStepId = useMemo<StepId>(() => {
     const firstPending = stepStates.find((step) => !step.isComplete && !step.optional)
@@ -156,22 +192,29 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
 
   const progressPercentage = completion.total ? Math.round((completion.completed / completion.total) * 100) : 0
 
+  const totalLessons = modules.reduce((acc, module) => acc + module.lessons.length, 0)
+  const totalBlocks = modules.reduce(
+    (acc, module) => acc + module.lessons.reduce((lessonAcc, lesson) => lessonAcc + lesson.blocks.length, 0),
+    0
+  )
+
   const stats = [
-    { label: 'Chapters', value: course.chapters.length.toString() },
+    { label: 'Modules', value: modules.length.toString() },
+    { label: 'Lessons', value: totalLessons.toString() },
+    { label: 'Content blocks', value: totalBlocks.toString() },
     { label: 'Resources', value: course.attachments.length.toString() },
     { label: 'Estimated duration', value: formatDuration(course.estimatedDurationMinutes) },
     { label: 'Status', value: course.isPublished ? 'Published' : 'Draft' },
   ]
 
-  const firstChapter = course.chapters[0]
-
   const launchChecklist = [
     { label: 'Course basics completed', complete: basicsComplete },
-    { label: 'At least one chapter created', complete: hasChapters },
+    { label: 'At least one module created', complete: hasModules },
+    { label: 'At least one lesson created', complete: hasLessons },
     {
-      label: 'Lesson media added',
-      complete: hasLessonMedia,
-      helper: 'Upload a video or paste a secure link inside each chapter.',
+      label: 'Content blocks added',
+      complete: hasBlocks,
+      helper: 'Add video lessons or resources to your lessons.',
     },
     { label: 'Resources attached (optional)', complete: hasResources, optional: true },
   ]
@@ -198,7 +241,7 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
                 description: course.description ?? '',
                 learningOutcomes: course.learningOutcomes ?? '',
                 prerequisites: course.prerequisites ?? '',
-                estimatedDurationMinutes: course.estimatedDurationMinutes ?? undefined,
+                estimatedDurationMinutes: course.estimatedDurationMinutes ?? null,
               }}
             />
           </div>
@@ -213,28 +256,14 @@ const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWiza
               </div>
               <h2 className="mt-2 text-xl font-semibold text-foreground">Structure your learning journey</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Create chapters, define the flow and open each workspace to upload videos, slides or interactive material.
+                Organize your content into modules and lessons with different content types. Build a structured learning experience.
               </p>
             </div>
-            <ChaptersForm initialData={course} courseId={courseId} />
-            <Card className="rounded-xl border border-border/60 bg-muted/30 shadow-none">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base font-semibold">How lessons work</CardTitle>
-                <CardDescription>
-                  Select any lesson from the list to open its workspace. From there you can upload media, attach files and
-                  prepare future gamification triggers.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <p>Upload a video or paste a secure streaming link, then enrich the lesson with PDFs, slides or links.</p>
-                <p>Need to gamify engagement? The workspace already reserves a spot for badges and points once the studio ships.</p>
-              </CardContent>
-              {firstChapter ? (
-                <CardFooter className="pt-0 text-xs text-muted-foreground">
-                  Your first lesson “{firstChapter.title}” is ready—click it in the list to customise.
-                </CardFooter>
-              ) : null}
-            </Card>
+            <CurriculumManager
+              courseId={courseId}
+              modules={modules}
+              onModulesChange={setModules}
+            />
           </div>
         )
       case 'resources':

@@ -63,6 +63,11 @@ enum QuestAssigneeType {
   TEAM
 }
 
+enum BlockType {
+  VIDEO_LESSON
+  RESOURCES
+}
+
 enum CourseEnrollmentStatus {
   NOT_STARTED
   IN_PROGRESS
@@ -130,6 +135,7 @@ model UserProfile {
   questParticipations     QuestAssignment[]      @relation("QuestAssignmentUser")
   liveSessionsHosted      LiveSession[]          @relation("LiveSessionHost")
   leaderboardEntries      LeaderboardEntry[]     @relation("LeaderboardEntryUser")
+  lessonProgress          UserLessonProgress[]
 }
 
 model CompanyTeam {
@@ -195,6 +201,7 @@ model Course {
   category        Category?              @relation(fields: [categoryId], references: [id])
   attachments     Attachment[]
   chapters        Chapter[]
+  modules         CourseModule[]
   enrollments     CourseEnrollment[]
   teamAssignments CourseTeamAssignment[]
   liveSessions    LiveSession[]
@@ -433,4 +440,89 @@ model LiveSession {
   company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   course  Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
   host    UserProfile @relation("LiveSessionHost", fields: [hostId], references: [id])
+}
+
+// New hierarchical course structure: Course → Module → Lesson → Block
+model CourseModule {
+  id          String   @id @default(cuid())
+  courseId    String
+  title       String
+  description String?
+  position    Int      @default(0)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([courseId])
+}
+
+model Lesson {
+  id                       String   @id @default(cuid())
+  moduleId                 String
+  title                    String
+  description              String?
+  position                 Int      @default(0)
+  estimatedDurationMinutes Int?
+  isPublished              Boolean  @default(false)
+  isPreview                Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  module  CourseModule        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  blocks  LessonBlock[]
+  progress UserLessonProgress[]
+
+  @@index([moduleId])
+}
+
+model LessonBlock {
+  id          String    @id @default(cuid())
+  lessonId    String
+  type        BlockType
+  title       String
+  content     String?
+  videoUrl    String?
+  contentUrl  String?
+  position    Int       @default(0)
+  isPublished Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  lesson      Lesson                  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  attachments LessonBlockAttachment[]
+
+  @@index([lessonId])
+}
+
+model LessonBlockAttachment {
+  id        String   @id @default(cuid())
+  blockId   String
+  name      String
+  url       String
+  type      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  block LessonBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@index([blockId])
+}
+
+model UserLessonProgress {
+  id            String    @id @default(cuid())
+  userProfileId String
+  lessonId      String
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  pointsAwarded Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  userProfile UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  lesson      Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userProfileId, lessonId])
 }
