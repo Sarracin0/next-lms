@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { AddParticipantsTrigger } from './add-participants-trigger'
 
 type ManageCourseRow = {
   id: string
@@ -101,6 +102,7 @@ export const columns: ColumnDef<ManageCourseRow>[] = [
                 Edit
               </DropdownMenuItem>
             </Link>
+            <AddParticipantsTrigger courseId={id} />
           </DropdownMenuContent>
         </DropdownMenu>
       )
