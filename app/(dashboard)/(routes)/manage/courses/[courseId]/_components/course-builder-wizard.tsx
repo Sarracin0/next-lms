@@ -6,11 +6,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type {
   Attachment,
   Course,
+  CourseAchievement as DbCourseAchievement,
   CourseModule as DbCourseModule,
   Lesson as DbLesson,
   LessonBlock as DbLessonBlock,
 } from '@prisma/client'
 import {
+  Award,
   CheckCircle2,
   Circle,
   FolderOpen,
@@ -25,6 +27,7 @@ import Actions from './actions'
 import { AttachmentForm } from './attachment-form'
 import CourseBasicsForm from './course-basics-form'
 import { CurriculumManager, mapModuleFromDb } from './curriculum-manager'
+import { CourseAchievementsPanel } from './course-achievements-panel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,8 +78,28 @@ type DbModuleWithRelations = DbCourseModule & {
   lessons: (DbLesson & { blocks: DbLessonBlock[] })[]
 }
 
+type DbAchievementWithRelations = DbCourseAchievement & {
+  targetModule: Pick<DbCourseModule, 'id' | 'title'> | null
+  targetLesson: Pick<DbLesson, 'id' | 'title'> | null
+}
+
+export type CourseAchievement = {
+  id: string
+  title: string
+  description?: string | null
+  unlockType: DbCourseAchievement['unlockType']
+  targetModuleId?: string | null
+  targetLessonId?: string | null
+  targetModule?: { id: string; title: string } | null
+  targetLesson?: { id: string; title: string } | null
+  pointsReward: number
+  icon?: string | null
+  isActive: boolean
+  createdAt: string
+}
+
 export type CourseBuilderWizardProps = {
-  course: Course & { attachments: Attachment[] }
+  course: Course & { attachments: Attachment[]; achievements: DbAchievementWithRelations[] }
   modules: DbModuleWithRelations[]
   courseId: string
   completion: {
@@ -93,7 +116,7 @@ export type CourseBuilderWizardProps = {
   }
 }
 
-type StepId = 'basics' | 'curriculum' | 'resources' | 'launch'
+type StepId = 'basics' | 'curriculum' | 'resources' | 'achievements' | 'launch'
 
 type StepDefinition = {
   id: StepId
@@ -129,6 +152,13 @@ const stepDefinitions: StepDefinition[] = [
     optional: true,
   },
   {
+    id: 'achievements',
+    title: 'Achievements & points',
+    description: 'Gamification rewards and unlock logic',
+    icon: Award,
+    optional: true,
+  },
+  {
     id: 'launch',
     title: 'Launch & rollout',
     description: 'Publish and plan assignments',
@@ -149,6 +179,21 @@ const formatDuration = (minutes?: number | null) => {
   return `${remainder}m`
 }
 
+const mapAchievementFromDb = (achievement: DbAchievementWithRelations): CourseAchievement => ({
+  id: achievement.id,
+  title: achievement.title,
+  description: achievement.description ?? null,
+  unlockType: achievement.unlockType,
+  targetModuleId: achievement.targetModuleId ?? null,
+  targetLessonId: achievement.targetLessonId ?? null,
+  targetModule: achievement.targetModule ? { id: achievement.targetModule.id, title: achievement.targetModule.title } : null,
+  targetLesson: achievement.targetLesson ? { id: achievement.targetLesson.id, title: achievement.targetLesson.title } : null,
+  pointsReward: achievement.pointsReward,
+  icon: achievement.icon ?? null,
+  isActive: achievement.isActive,
+  createdAt: new Date(achievement.createdAt).toISOString(),
+})
+
 const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completion }: CourseBuilderWizardProps) => {
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -156,10 +201,17 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
 
   // State for the new hierarchical structure
   const [modules, setModules] = useState<Module[]>(() => modulesProp.map(mapModuleFromDb))
+  const [achievements, setAchievements] = useState<CourseAchievement[]>(() =>
+    course.achievements.map(mapAchievementFromDb),
+  )
 
   useEffect(() => {
     setModules(modulesProp.map(mapModuleFromDb))
   }, [modulesProp])
+
+  useEffect(() => {
+    setAchievements(course.achievements.map(mapAchievementFromDb))
+  }, [course.achievements])
 
   const basicsComplete = Boolean(course.title && course.description)
   const hasModules = modules.length > 0
@@ -169,12 +221,14 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
   )
   const courseResources = course.attachments.filter((attachment) => attachment.chapterId == null)
   const hasResources = course.attachments.length > 0
+  const hasAchievements = achievements.length > 0
 
   const stepStates = useMemo<StepState[]>(() => {
     const completionMap: Record<StepId, boolean> = {
       basics: basicsComplete,
       curriculum: hasModules && hasLessons && hasBlocks,
       resources: hasResources,
+      achievements: hasAchievements,
       launch: hasModules && hasLessons && hasBlocks,
     }
 
@@ -189,7 +243,7 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
         isLocked,
       }
     })
-  }, [basicsComplete, hasModules, hasLessons, hasBlocks, hasResources])
+  }, [basicsComplete, hasModules, hasLessons, hasBlocks, hasResources, hasAchievements])
 
   const defaultStepId = useMemo<StepId>(() => {
     const firstPending = stepStates.find((step) => !step.isComplete && !step.optional)
@@ -228,6 +282,7 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
     { label: 'Lessons', value: totalLessons.toString() },
     { label: 'Content blocks', value: totalBlocks.toString() },
     { label: 'Resources', value: course.attachments.length.toString() },
+    { label: 'Achievements', value: achievements.length.toString() },
     { label: 'Estimated duration', value: formatDuration(course.estimatedDurationMinutes) },
     { label: 'Status', value: course.isPublished ? 'Published' : 'Draft' },
   ]
@@ -242,6 +297,7 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
       helper: 'Add video lessons or resources to your lessons.',
     },
     { label: 'Resources attached (optional)', complete: hasResources, optional: true },
+    { label: 'Achievements configured (optional)', complete: hasAchievements, optional: true },
   ]
 
   const renderStepContent = () => {
@@ -315,6 +371,27 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
                 <p>Need something interactive? Link to your LMS quizzes or surveys and track completions via analytics.</p>
               </CardContent>
             </Card>
+          </div>
+        )
+      case 'achievements':
+        return (
+          <div className="space-y-6">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <Award className="h-4 w-4 text-primary" />
+                Achievements
+              </div>
+              <h2 className="mt-2 text-xl font-semibold text-foreground">Premia i progressi del team</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Definisci reward e punti, scegli le condizioni di sblocco e comunica ai learner cosa possono ottenere.
+              </p>
+            </div>
+            <CourseAchievementsPanel
+              courseId={courseId}
+              achievements={achievements}
+              modules={modules}
+              onAchievementsChange={setAchievements}
+            />
           </div>
         )
       case 'launch':

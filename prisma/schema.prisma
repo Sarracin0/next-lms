@@ -83,6 +83,12 @@ enum CourseEnrollmentSource {
   SELF_ENROLL
 }
 
+enum AchievementUnlockType {
+  FIRST_CHAPTER
+  MODULE_COMPLETION
+  COURSE_COMPLETION
+}
+
 model Company {
   id          String   @id @default(cuid())
   clerkOrgId  String   @unique
@@ -137,6 +143,8 @@ model UserProfile {
   liveSessionsHosted      LiveSession[]          @relation("LiveSessionHost")
   leaderboardEntries      LeaderboardEntry[]     @relation("LeaderboardEntryUser")
   lessonProgress          UserLessonProgress[]
+  achievementsUnlocked    UserCourseAchievement[]
+  achievementsCreated     CourseAchievement[]     @relation("CourseAchievementCreatedBy")
 }
 
 model CompanyTeam {
@@ -207,6 +215,7 @@ model Course {
   teamAssignments CourseTeamAssignment[]
   liveSessions    LiveSession[]
   missions        QuestMission[]
+  achievements    CourseAchievement[]
 }
 
 model Attachment {
@@ -458,6 +467,7 @@ model CourseModule {
 
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
+  achievements CourseAchievement[]
 
   @@index([courseId])
 }
@@ -477,6 +487,7 @@ model Lesson {
   module  CourseModule        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   blocks  LessonBlock[]
   progress UserLessonProgress[]
+  achievements CourseAchievement[]
 
   @@index([moduleId])
 }
@@ -517,6 +528,45 @@ model LessonBlockAttachment {
   block LessonBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
 
   @@index([blockId])
+}
+
+model CourseAchievement {
+  id                 String                   @id @default(cuid())
+  courseId           String
+  title              String
+  description        String?
+  unlockType         AchievementUnlockType
+  targetModuleId     String?
+  targetLessonId     String?
+  pointsReward       Int                      @default(0)
+  icon               String?
+  isActive           Boolean                  @default(true)
+  createdByProfileId String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdBy   UserProfile @relation("CourseAchievementCreatedBy", fields: [createdByProfileId], references: [id], onDelete: Cascade)
+  targetModule CourseModule? @relation(fields: [targetModuleId], references: [id])
+  targetLesson Lesson?    @relation(fields: [targetLessonId], references: [id])
+  awards      UserCourseAchievement[]
+
+  @@index([courseId])
+  @@index([targetModuleId])
+  @@index([targetLessonId])
+}
+
+model UserCourseAchievement {
+  id              String    @id @default(cuid())
+  userProfileId   String
+  achievementId   String
+  pointsAwarded   Int       @default(0)
+  awardedAt       DateTime  @default(now())
+
+  userProfile UserProfile       @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  achievement CourseAchievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userProfileId, achievementId])
 }
 
 model UserLessonProgress {

@@ -25,6 +25,23 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
     include: {
       attachments: { orderBy: { createdAt: 'desc' } },
       chapters: { orderBy: { position: 'asc' } },
+      achievements: {
+        orderBy: { createdAt: 'asc' },
+        include: {
+          targetModule: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          targetLesson: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+      },
     },
   })
 
@@ -57,6 +74,7 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
   const hasSupportingResources =
     course.attachments.length > 0 ||
     blocks.some((block) => block.type === 'RESOURCES' && Boolean(block.contentUrl))
+  const hasGamification = course.achievements.length > 0
 
   const recommended = [
     {
@@ -82,6 +100,12 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
       label: 'Supporting resources attached',
       helper: 'Optional slides, PDFs or links',
       isComplete: hasSupportingResources,
+    },
+    {
+      id: 'achievements',
+      label: 'Achievements configured',
+      helper: 'Motivate learners with rewards',
+      isComplete: hasGamification,
     },
   ]
 

@@ -5,6 +5,7 @@ import { logError } from '@/lib/logger'
 import { db } from '@/lib/db'
 import { getProgress } from '@/actions/get-progress'
 import { requireAuthContext } from '@/lib/current-profile'
+import { evaluateCourseAchievements } from '@/lib/evaluate-course-achievements'
 
 type RouteParams = Promise<{
   courseId: string
@@ -124,6 +125,12 @@ export async function PUT(request: NextRequest, { params }: { params: RouteParam
         },
       })
     }
+
+    await evaluateCourseAchievements({
+      courseId,
+      userProfileId: profile.id,
+      progressPercentage,
+    })
 
     return NextResponse.json(progress)
   } catch (error) {

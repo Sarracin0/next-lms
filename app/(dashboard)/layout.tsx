@@ -32,7 +32,7 @@ const DashboardLayout = async ({ children }: { children: React.ReactNode }) => {
         <div className="fixed inset-y-0 z-50 h-[80px] w-full md:pl-64">
           <Navbar />
         </div>
-        <div className="fixed inset-y-0 z-50 hidden h-full w-64 flex-col md:flex">
+        <div className="fixed inset-y-0 z-40 hidden h-full w-64 flex-col md:flex">
           <Sidebar />
         </div>
         <main className="h-full bg-muted/40 pt-[80px] md:pl-64">{children}</main>
