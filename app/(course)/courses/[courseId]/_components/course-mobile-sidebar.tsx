@@ -1,15 +1,10 @@
-import { Prisma } from '@prisma/client'
 import { MenuIcon } from 'lucide-react'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import CourseSidebar from './course-sidebar'
+import { CourseWithStructure } from './course-sidebar.types'
 
 type CourseMobileSidebarProps = {
-  course: Prisma.CourseGetPayload<{
-    include: {
-      chapters: { include: { progress: true, attachments: true } }
-      enrollments: true
-    }
-  }>
+  course: CourseWithStructure
   progressCount: number
 }
 

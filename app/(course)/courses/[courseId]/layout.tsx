@@ -29,6 +29,23 @@ export default async function CourseLayout({ children, params }: CourseLayoutPro
         },
         orderBy: { position: 'asc' },
       },
+      modules: {
+        where: { isPublished: true },
+        include: {
+          lessons: {
+            where: { isPublished: true },
+            include: {
+              blocks: {
+                where: { isPublished: true },
+                orderBy: { position: 'asc' },
+              },
+              progress: { where: { userProfileId: profile.id } },
+            },
+            orderBy: { position: 'asc' },
+          },
+        },
+        orderBy: { position: 'asc' },
+      },
       enrollments: {
         where: { userProfileId: profile.id },
         select: { id: true, status: true, userProfileId: true },
@@ -65,11 +82,11 @@ export default async function CourseLayout({ children, params }: CourseLayoutPro
     >
       <div className="h-full">
         <div className="fixed inset-y-0 z-50 h-20 w-full md:pl-80">
-          <CourseNavbar course={course} progressCount={progressCount} />
+          <CourseNavbar course={course as any} progressCount={progressCount} />
         </div>
 
         <div className="fixed inset-y-0 z-50 hidden h-full w-80 flex-col md:flex">
-          <CourseSidebar course={course} progressCount={progressCount} />
+          <CourseSidebar course={course as any} progressCount={progressCount} />
         </div>
 
         <main className="h-full pt-20 md:pl-80">{children}</main>
