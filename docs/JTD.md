@@ -1,14 +1,3 @@
-DATABASE STRUCTURE ANALYSIS
-DA TENERE (Foundation Solid)
-sql- Course (core entity) ✅
-- Category (organizing content) ✅
-- Attachment (learning resources) ✅
-- Chapter (structured content) ✅
-- UserProgress (tracking essenziale) ✅
-DA RIMUOVERE (Payment-Related)
-sql- Purchase (sistema a pagamento) ❌
-- StripeCustomer (integrazione Stripe) ❌
-- MuxData (troppo costoso per MVP) ❌
 DA AGGIUNGERE (Gamification Core)
 sql- UserProfile (extended user data)
 - Badge (achievement system)
