@@ -4,6 +4,7 @@ import { BlockType, UserRole } from '@prisma/client'
 import { db } from '@/lib/db'
 import { assertRole, requireAuthContext } from '@/lib/current-profile'
 import { logError } from '@/lib/logger'
+import { syncLegacyChapterForBlock } from '@/lib/sync-legacy-chapter'
 
 type RouteParams = Promise<{
   courseId: string
@@ -86,6 +87,8 @@ export async function PATCH(request: NextRequest, { params }: { params: RoutePar
       data,
     })
 
+    await syncLegacyChapterForBlock(blockId)
+
     return NextResponse.json(block)
   } catch (error) {
     logError('COURSE_BLOCK_PATCH', error)
@@ -118,6 +121,10 @@ export async function DELETE(request: NextRequest, { params }: { params: RoutePa
     }
 
     await db.lessonBlock.delete({ where: { id: blockId } })
+
+    if (blockRecord.legacyChapterId) {
+      await db.chapter.delete({ where: { id: blockRecord.legacyChapterId } }).catch(() => undefined)
+    }
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {

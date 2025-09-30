@@ -4,6 +4,7 @@ import { logError } from '@/lib/logger'
 
 import { db } from '@/lib/db'
 import { assertRole, requireAuthContext } from '@/lib/current-profile'
+import { syncLegacyChaptersForCourse } from '@/lib/sync-legacy-chapter'
 
 type RouteParams = Promise<{
   courseId: string
@@ -34,6 +35,8 @@ export async function PATCH(request: NextRequest, { params }: { params: RoutePar
       where: { id: courseId },
       data: { isPublished: true },
     })
+
+    await syncLegacyChaptersForCourse(courseId)
 
     return NextResponse.json(publishedCourse)
   } catch (error) {

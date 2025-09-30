@@ -243,6 +243,7 @@ model Chapter {
   progress    UserProgress[]
   missions    QuestMission[]
   attachments Attachment[]
+  lessonBlock LessonBlock?  @relation("LessonBlockChapter")
 
   @@index([courseId])
 }
@@ -493,6 +494,8 @@ model LessonBlock {
 
   lesson      Lesson                  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   attachments LessonBlockAttachment[]
+  legacyChapterId String?  @unique
+  legacyChapter   Chapter? @relation("LessonBlockChapter", fields: [legacyChapterId], references: [id], onDelete: SetNull)
 
   @@index([lessonId])
 }

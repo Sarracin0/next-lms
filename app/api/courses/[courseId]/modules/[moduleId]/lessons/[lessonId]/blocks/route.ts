@@ -4,6 +4,7 @@ import { BlockType, UserRole } from '@prisma/client'
 import { db } from '@/lib/db'
 import { assertRole, requireAuthContext } from '@/lib/current-profile'
 import { logError } from '@/lib/logger'
+import { syncLegacyChapterForBlock } from '@/lib/sync-legacy-chapter'
 
 type RouteParams = Promise<{
   courseId: string
@@ -62,6 +63,8 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
         contentUrl: typeof body.contentUrl === 'string' ? body.contentUrl.trim() || null : null,
       },
     })
+
+    await syncLegacyChapterForBlock(block.id)
 
     return NextResponse.json(block, { status: 201 })
   } catch (error) {

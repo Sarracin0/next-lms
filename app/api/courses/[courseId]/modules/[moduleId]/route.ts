@@ -4,6 +4,7 @@ import { UserRole } from '@prisma/client'
 import { db } from '@/lib/db'
 import { assertRole, requireAuthContext } from '@/lib/current-profile'
 import { logError } from '@/lib/logger'
+import { syncLegacyChaptersForModule } from '@/lib/sync-legacy-chapter'
 
 const moduleInclude = {
   lessons: {
@@ -77,6 +78,10 @@ export async function PATCH(request: NextRequest, { params }: { params: RoutePar
       include: moduleInclude,
     })
 
+    if (Object.keys(data).some((key) => ['isPublished', 'position', 'description', 'title'].includes(key))) {
+      await syncLegacyChaptersForModule(moduleId)
+    }
+
     return NextResponse.json(module)
   } catch (error) {
     logError('COURSE_MODULE_PATCH', error)
@@ -93,7 +98,7 @@ export async function DELETE(request: NextRequest, { params }: { params: RoutePa
 
     const moduleRecord = await db.courseModule.findFirst({
       where: { id: moduleId, courseId, course: { companyId: company.id } },
-      include: { course: true },
+      include: { course: true, lessons: { include: { blocks: { select: { legacyChapterId: true } } } } },
     })
 
     if (!moduleRecord) {
@@ -106,7 +111,17 @@ export async function DELETE(request: NextRequest, { params }: { params: RoutePa
       }
     }
 
+    const chapterIds = moduleRecord.lessons.flatMap((lesson) =>
+      lesson.blocks
+        .map((block) => block.legacyChapterId)
+        .filter((id): id is string => Boolean(id))
+    )
+
     await db.courseModule.delete({ where: { id: moduleId } })
+
+    if (chapterIds.length > 0) {
+      await db.chapter.deleteMany({ where: { id: { in: chapterIds } } })
+    }
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
