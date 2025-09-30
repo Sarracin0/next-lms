@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
       const durationMinutes = typeof body.durationMinutes === 'number' ? body.durationMinutes : 60
       const meetingCode = Math.random().toString(36).slice(2, 8).toUpperCase()
       const meetingId = `BBB-${meetingCode}`
-      const joinUrl = baseContentUrl ?? `https://kimpy-virtual-classroom.example/${meetingId}`
+      const joinUrl = baseContentUrl ?? `https://kimpy-virtual-classroom.kimpy.com/${meetingId}`
 
       const liveSession = await db.liveSession.create({
         data: {
