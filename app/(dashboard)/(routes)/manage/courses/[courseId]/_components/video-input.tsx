@@ -10,28 +10,23 @@ import { cn } from '@/lib/utils'
 
 type VideoInputMode = 'upload' | 'url'
 
-type VideoInputProps = {
+interface VideoInputProps {
   value?: string
   onChange: (value: string) => void
-  placeholder?: string
   className?: string
 }
 
-export const VideoInput = ({ value, onChange, placeholder = "Video URL or upload", className }: VideoInputProps) => {
+export const VideoInput = ({ value, onChange, className }: VideoInputProps) => {
   const [mode, setMode] = useState<VideoInputMode>('url')
-  const [isUploading, setIsUploading] = useState(false)
 
   const handleUrlChange = (url: string) => {
     onChange(url)
   }
 
-  const handleUploadComplete = (url: string) => {
-    onChange(url)
-    setIsUploading(false)
-  }
-
-  const handleUploadError = () => {
-    setIsUploading(false)
+  const handleUploadComplete = (url?: string) => {
+    if (url) {
+      onChange(url)
+    }
   }
 
   const clearVideo = () => {
@@ -49,9 +44,8 @@ export const VideoInput = ({ value, onChange, placeholder = "Video URL or upload
           variant={mode === 'url' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setMode('url')}
-          className="flex items-center gap-2"
         >
-          <Link className="h-4 w-4" />
+          <Link className="h-4 w-4 mr-2" />
           Insert URL
         </Button>
         <Button
@@ -59,9 +53,8 @@ export const VideoInput = ({ value, onChange, placeholder = "Video URL or upload
           variant={mode === 'upload' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setMode('upload')}
-          className="flex items-center gap-2"
         >
-          <Upload className="h-4 w-4" />
+          <Upload className="h-4 w-4 mr-2" />
           Upload File
         </Button>
       </div>
@@ -73,7 +66,6 @@ export const VideoInput = ({ value, onChange, placeholder = "Video URL or upload
             value={value || ''}
             onChange={(e) => handleUrlChange(e.target.value)}
             placeholder="Paste video URL (YouTube, Vimeo, etc.)"
-            className="w-full"
           />
           {hasVideo && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
