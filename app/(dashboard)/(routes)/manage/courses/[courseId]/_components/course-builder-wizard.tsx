@@ -1,9 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import type { Attachment, Chapter, Course } from '@prisma/client'
+import type {
+  Attachment,
+  Course,
+  CourseModule as DbCourseModule,
+  Lesson as DbLesson,
+  LessonBlock as DbLessonBlock,
+} from '@prisma/client'
 import {
   CheckCircle2,
   Circle,
@@ -18,7 +24,7 @@ import {
 import Actions from './actions'
 import { AttachmentForm } from './attachment-form'
 import CourseBasicsForm from './course-basics-form'
-import { CurriculumManager } from './curriculum-manager'
+import { CurriculumManager, mapModuleFromDb } from './curriculum-manager'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -55,8 +61,13 @@ export type LessonBlock = {
   isPublished: boolean
 }
 
+type DbModuleWithRelations = DbCourseModule & {
+  lessons: (DbLesson & { blocks: DbLessonBlock[] })[]
+}
+
 export type CourseBuilderWizardProps = {
-  course: Course & { attachments: Attachment[]; chapters: Chapter[] }
+  course: Course & { attachments: Attachment[] }
+  modules: DbModuleWithRelations[]
   courseId: string
   completion: {
     completed: number
@@ -128,13 +139,17 @@ const formatDuration = (minutes?: number | null) => {
   return `${remainder}m`
 }
 
-const CourseBuilderWizard = ({ course, courseId, completion }: CourseBuilderWizardProps) => {
+const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completion }: CourseBuilderWizardProps) => {
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
 
   // State for the new hierarchical structure
-  const [modules, setModules] = useState<Module[]>([])
+  const [modules, setModules] = useState<Module[]>(() => modulesProp.map(mapModuleFromDb))
+
+  useEffect(() => {
+    setModules(modulesProp.map(mapModuleFromDb))
+  }, [modulesProp])
 
   const basicsComplete = Boolean(course.title && course.description)
   const hasModules = modules.length > 0

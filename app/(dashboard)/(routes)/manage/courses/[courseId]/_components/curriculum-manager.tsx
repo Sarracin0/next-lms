@@ -1,170 +1,370 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
+import axios from 'axios'
+import toast from 'react-hot-toast'
+import type { CourseModule as DbCourseModule, Lesson as DbLesson, LessonBlock as DbLessonBlock } from '@prisma/client'
 import { Plus, FolderOpen, BookOpen, Video, FileText } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ModuleAccordion, type Module, type Lesson, type LessonBlock } from './module-accordion'
-import { cn } from '@/lib/utils'
+
+type ModulePayload = DbCourseModule & {
+  lessons: (DbLesson & { blocks: DbLessonBlock[] })[]
+}
+
+type LessonPayload = DbLesson & { blocks: DbLessonBlock[] }
+
+const sortByPosition = <T extends { position: number }>(items: T[]) => [...items].sort((a, b) => a.position - b.position)
+
+const mapBlockFromDb = (block: DbLessonBlock): LessonBlock => ({
+  id: block.id,
+  type: block.type,
+  title: block.title,
+  content: block.content ?? '',
+  videoUrl: block.videoUrl ?? '',
+  contentUrl: block.contentUrl ?? '',
+  position: block.position,
+  isPublished: block.isPublished,
+})
+
+const mapLessonFromDb = (lesson: LessonPayload): Lesson => ({
+  id: lesson.id,
+  title: lesson.title,
+  description: lesson.description ?? '',
+  position: lesson.position,
+  isPublished: lesson.isPublished,
+  blocks: sortByPosition(lesson.blocks).map(mapBlockFromDb),
+})
+
+export const mapModuleFromDb = (module: ModulePayload): Module => ({
+  id: module.id,
+  title: module.title,
+  description: module.description ?? '',
+  position: module.position,
+  isPublished: module.isPublished,
+  lessons: sortByPosition(module.lessons).map(mapLessonFromDb),
+})
 
 type CurriculumManagerProps = {
   courseId: string
   modules: Module[]
-  onModulesChange: (modules: Module[]) => void
+  onModulesChange: Dispatch<SetStateAction<Module[]>>
+}
+
+const normalizeNullable = (value?: string) => {
+  const trimmed = value?.trim() ?? ''
+  return trimmed.length > 0 ? trimmed : null
 }
 
 export const CurriculumManager = ({ courseId, modules, onModulesChange }: CurriculumManagerProps) => {
   const [newModuleTitle, setNewModuleTitle] = useState('')
   const [isAddingModule, setIsAddingModule] = useState(false)
+  const [isCreatingModule, setIsCreatingModule] = useState(false)
 
-  const handleAddModule = () => {
-    if (!newModuleTitle.trim()) return
+  const updateModuleState = (moduleId: string, updater: (module: Module) => Module) => {
+    onModulesChange((prev) => prev.map((module) => (module.id === moduleId ? updater(module) : module)))
+  }
 
-    const newModule: Module = {
-      id: `module-${Date.now()}`,
-      title: newModuleTitle.trim(),
-      description: '',
-      position: modules.length,
-      isPublished: false,
-      lessons: [],
+  const updateLessonState = (
+    moduleId: string,
+    lessonId: string,
+    updater: (lesson: Lesson) => Lesson,
+  ) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id !== moduleId
+          ? module
+          : {
+              ...module,
+              lessons: module.lessons.map((lesson) =>
+                lesson.id === lessonId ? updater(lesson) : lesson,
+              ),
+            },
+      ),
+    )
+  }
+
+  const updateBlockState = (
+    moduleId: string,
+    lessonId: string,
+    blockId: string,
+    updater: (block: LessonBlock) => LessonBlock,
+  ) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id !== moduleId
+          ? module
+          : {
+              ...module,
+              lessons: module.lessons.map((lesson) =>
+                lesson.id !== lessonId
+                  ? lesson
+                  : {
+                      ...lesson,
+                      blocks: lesson.blocks.map((block) =>
+                        block.id === blockId ? updater(block) : block,
+                      ),
+                    },
+              ),
+            },
+      ),
+    )
+  }
+
+  const appendLessonState = (moduleId: string, lesson: Lesson) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id === moduleId ? { ...module, lessons: [...module.lessons, lesson] } : module,
+      ),
+    )
+  }
+
+  const appendBlockState = (moduleId: string, lessonId: string, block: LessonBlock) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id !== moduleId
+          ? module
+          : {
+              ...module,
+              lessons: module.lessons.map((lesson) =>
+                lesson.id === lessonId
+                  ? { ...lesson, blocks: [...lesson.blocks, block] }
+                  : lesson,
+              ),
+            },
+      ),
+    )
+  }
+
+  const removeModuleState = (moduleId: string) => {
+    onModulesChange((prev) => prev.filter((module) => module.id !== moduleId))
+  }
+
+  const removeLessonState = (moduleId: string, lessonId: string) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id !== moduleId
+          ? module
+          : {
+              ...module,
+              lessons: module.lessons.filter((lesson) => lesson.id !== lessonId),
+            },
+      ),
+    )
+  }
+
+  const removeBlockState = (moduleId: string, lessonId: string, blockId: string) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id !== moduleId
+          ? module
+          : {
+              ...module,
+              lessons: module.lessons.map((lesson) =>
+                lesson.id !== lessonId
+                  ? lesson
+                  : {
+                      ...lesson,
+                      blocks: lesson.blocks.filter((block) => block.id !== blockId),
+                    },
+              ),
+            },
+      ),
+    )
+  }
+
+  const handleAddModule = async () => {
+    const title = newModuleTitle.trim()
+    if (!title || isCreatingModule) {
+      return
     }
 
-    onModulesChange([...modules, newModule])
-    setNewModuleTitle('')
-    setIsAddingModule(false)
+    setIsCreatingModule(true)
+    try {
+      const response = await axios.post<ModulePayload>(`/api/courses/${courseId}/modules`, {
+        title,
+      })
+      const newModule = mapModuleFromDb(response.data)
+      onModulesChange((prev) => [...prev, newModule])
+      toast.success('Module created')
+      setNewModuleTitle('')
+      setIsAddingModule(false)
+    } catch {
+      toast.error('Unable to create module')
+    } finally {
+      setIsCreatingModule(false)
+    }
   }
 
   const handleUpdateModule = (moduleId: string, data: Partial<Module>) => {
-    const updatedModules = modules.map((module) =>
-      module.id === moduleId ? { ...module, ...data } : module
-    )
-    onModulesChange(updatedModules)
+    updateModuleState(moduleId, (module) => ({ ...module, ...data }))
   }
 
-  const handleDeleteModule = (moduleId: string) => {
-    const updatedModules = modules.filter((module) => module.id !== moduleId)
-    onModulesChange(updatedModules)
-  }
+  const handlePersistModule = async (moduleId: string, overrides?: Partial<Module>) => {
+    const module = modules.find((item) => item.id === moduleId)
+    if (!module) return
 
-  const handleAddLesson = (moduleId: string) => {
-    const newLesson: Lesson = {
-      id: `lesson-${Date.now()}`,
-      title: 'New Lesson',
-      description: '',
-      position: 0,
-      isPublished: false,
-      blocks: [],
+    const payload = overrides ? { ...module, ...overrides } : module
+
+    try {
+      await axios.patch(`/api/courses/${courseId}/modules/${moduleId}`, {
+        title: payload.title.trim(),
+        description: normalizeNullable(payload.description),
+        isPublished: payload.isPublished,
+      })
+    } catch {
+      toast.error('Unable to save module changes')
     }
-
-    const updatedModules = modules.map((module) =>
-      module.id === moduleId
-        ? { ...module, lessons: [...module.lessons, newLesson] }
-        : module
-    )
-    onModulesChange(updatedModules)
   }
 
-  const handleUpdateLesson = (moduleId: string, lessonId: string, data: Partial<Lesson>) => {
-    const updatedModules = modules.map((module) =>
-      module.id === moduleId
-        ? {
-            ...module,
-            lessons: module.lessons.map((lesson) =>
-              lesson.id === lessonId ? { ...lesson, ...data } : lesson
-            ),
-          }
-        : module
-    )
-    onModulesChange(updatedModules)
+  const handleDeleteModule = async (moduleId: string) => {
+    try {
+      await axios.delete(`/api/courses/${courseId}/modules/${moduleId}`)
+      removeModuleState(moduleId)
+      toast.success('Module deleted')
+    } catch {
+      toast.error('Unable to delete module')
+    }
   }
 
-  const handleDeleteLesson = (moduleId: string, lessonId: string) => {
-    const updatedModules = modules.map((module) =>
-      module.id === moduleId
-        ? { ...module, lessons: module.lessons.filter((lesson) => lesson.id !== lessonId) }
-        : module
-    )
-    onModulesChange(updatedModules)
+  const handleAddLesson = async (moduleId: string) => {
+    try {
+      const response = await axios.post<LessonPayload>(
+        `/api/courses/${courseId}/modules/${moduleId}/lessons`,
+        {
+          title: 'New Lesson',
+        },
+      )
+      const lesson = mapLessonFromDb(response.data)
+      appendLessonState(moduleId, lesson)
+      toast.success('Lesson added')
+    } catch {
+      toast.error('Unable to create lesson')
+    }
   }
 
-  const handleAddBlock = (
+  const handleUpdateLesson = (
     moduleId: string,
     lessonId: string,
-    type: 'VIDEO_LESSON' | 'RESOURCES'
+    data: Partial<Lesson>,
   ) => {
-    const newBlock: LessonBlock = {
-      id: `block-${Date.now()}`,
-      type,
-      title: type === 'VIDEO_LESSON' ? 'New Video Lesson' : 'New Resources',
-      content: '',
-      videoUrl: type === 'VIDEO_LESSON' ? '' : undefined,
-      contentUrl: type === 'RESOURCES' ? '' : undefined,
-      position: 0,
-      isPublished: false,
-    }
+    updateLessonState(moduleId, lessonId, (lesson) => ({ ...lesson, ...data }))
+  }
 
-    const updatedModules = modules.map((module) =>
-      module.id === moduleId
-        ? {
-            ...module,
-            lessons: module.lessons.map((lesson) =>
-              lesson.id === lessonId
-                ? { ...lesson, blocks: [...lesson.blocks, newBlock] }
-                : lesson
-            ),
-          }
-        : module
-    )
-    onModulesChange(updatedModules)
+  const handlePersistLesson = async (moduleId: string, lessonId: string, overrides?: Partial<Lesson>) => {
+    const module = modules.find((item) => item.id === moduleId)
+    const lesson = module?.lessons.find((item) => item.id === lessonId)
+    if (!lesson) return
+
+    const payload = overrides ? { ...lesson, ...overrides } : lesson
+
+    try {
+      await axios.patch(`/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}`, {
+        title: payload.title.trim(),
+        description: normalizeNullable(payload.description),
+        isPublished: payload.isPublished,
+      })
+    } catch {
+      toast.error('Unable to save lesson changes')
+    }
+  }
+
+  const handleDeleteLesson = async (moduleId: string, lessonId: string) => {
+    try {
+      await axios.delete(`/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}`)
+      removeLessonState(moduleId, lessonId)
+      toast.success('Lesson deleted')
+    } catch {
+      toast.error('Unable to delete lesson')
+    }
+  }
+
+  const handleAddBlock = async (
+    moduleId: string,
+    lessonId: string,
+    type: 'VIDEO_LESSON' | 'RESOURCES',
+  ) => {
+    try {
+      const response = await axios.post<DbLessonBlock>(
+        `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/blocks`,
+        {
+          type,
+          title: type === 'VIDEO_LESSON' ? 'New Video Lesson' : 'New Resources',
+        },
+      )
+      const block = mapBlockFromDb(response.data)
+      appendBlockState(moduleId, lessonId, block)
+      toast.success('Content block added')
+    } catch {
+      toast.error('Unable to add content block')
+    }
   }
 
   const handleUpdateBlock = (
     moduleId: string,
     lessonId: string,
     blockId: string,
-    data: Partial<LessonBlock>
+    data: Partial<LessonBlock>,
   ) => {
-    const updatedModules = modules.map((module) =>
-      module.id === moduleId
-        ? {
-            ...module,
-            lessons: module.lessons.map((lesson) =>
-              lesson.id === lessonId
-                ? {
-                    ...lesson,
-                    blocks: lesson.blocks.map((block) =>
-                      block.id === blockId ? { ...block, ...data } : block
-                    ),
-                  }
-                : lesson
-            ),
-          }
-        : module
-    )
-    onModulesChange(updatedModules)
+    updateBlockState(moduleId, lessonId, blockId, (block) => ({ ...block, ...data }))
+
+    if (
+      Object.prototype.hasOwnProperty.call(data, 'videoUrl') ||
+      Object.prototype.hasOwnProperty.call(data, 'contentUrl')
+    ) {
+      void handlePersistBlock(moduleId, lessonId, blockId, data)
+    }
   }
 
-  const handleDeleteBlock = (moduleId: string, lessonId: string, blockId: string) => {
-    const updatedModules = modules.map((module) =>
-      module.id === moduleId
-        ? {
-            ...module,
-            lessons: module.lessons.map((lesson) =>
-              lesson.id === lessonId
-                ? { ...lesson, blocks: lesson.blocks.filter((block) => block.id !== blockId) }
-                : lesson
-            ),
-          }
-        : module
-    )
-    onModulesChange(updatedModules)
+  const handlePersistBlock = async (
+    moduleId: string,
+    lessonId: string,
+    blockId: string,
+    overrides?: Partial<LessonBlock>,
+  ) => {
+    const module = modules.find((item) => item.id === moduleId)
+    const lesson = module?.lessons.find((item) => item.id === lessonId)
+    const block = lesson?.blocks.find((item) => item.id === blockId)
+    if (!block) return
+
+    const payload = overrides ? { ...block, ...overrides } : block
+
+    try {
+      await axios.patch(
+        `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/blocks/${blockId}`,
+        {
+          title: payload.title.trim(),
+          content: normalizeNullable(payload.content),
+          videoUrl: normalizeNullable(payload.videoUrl),
+          contentUrl: normalizeNullable(payload.contentUrl),
+          isPublished: payload.isPublished,
+        },
+      )
+    } catch {
+      toast.error('Unable to save block changes')
+    }
+  }
+
+  const handleDeleteBlock = async (moduleId: string, lessonId: string, blockId: string) => {
+    try {
+      await axios.delete(
+        `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/blocks/${blockId}`,
+      )
+      removeBlockState(moduleId, lessonId, blockId)
+      toast.success('Block deleted')
+    } catch {
+      toast.error('Unable to delete block')
+    }
   }
 
   const totalLessons = modules.reduce((acc, module) => acc + module.lessons.length, 0)
   const totalBlocks = modules.reduce(
-    (acc, module) => acc + module.lessons.reduce((lessonAcc, lesson) => lessonAcc + lesson.blocks.length, 0),
-    0
+    (acc, module) =>
+      acc + module.lessons.reduce((lessonAcc, lesson) => lessonAcc + lesson.blocks.length, 0),
+    0,
   )
 
   return (
@@ -206,16 +406,17 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
                 placeholder="Module title..."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    handleAddModule()
+                    void handleAddModule()
                   } else if (e.key === 'Escape') {
                     setIsAddingModule(false)
                     setNewModuleTitle('')
                   }
                 }}
                 autoFocus
+                disabled={isCreatingModule}
               />
-              <Button onClick={handleAddModule} disabled={!newModuleTitle.trim()}>
-                Add
+              <Button onClick={handleAddModule} disabled={!newModuleTitle.trim() || isCreatingModule}>
+                {isCreatingModule ? 'Adding…' : 'Add'}
               </Button>
               <Button
                 variant="outline"
@@ -223,6 +424,7 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
                   setIsAddingModule(false)
                   setNewModuleTitle('')
                 }}
+                disabled={isCreatingModule}
               >
                 Cancel
               </Button>
@@ -259,12 +461,15 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
               module={module}
               onUpdateModule={handleUpdateModule}
               onDeleteModule={handleDeleteModule}
+              onPersistModule={handlePersistModule}
               onAddLesson={handleAddLesson}
               onUpdateLesson={handleUpdateLesson}
               onDeleteLesson={handleDeleteLesson}
+              onPersistLesson={handlePersistLesson}
               onAddBlock={handleAddBlock}
               onUpdateBlock={handleUpdateBlock}
               onDeleteBlock={handleDeleteBlock}
+              onPersistBlock={handlePersistBlock}
             />
           ))
         )}
@@ -312,3 +517,5 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
     </div>
   )
 }
+
+export default CurriculumManager

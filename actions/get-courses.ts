@@ -1,4 +1,11 @@
-import { Category, Chapter, Course, CourseEnrollment, CourseEnrollmentStatus } from '@prisma/client'
+import {
+  Category,
+  Chapter,
+  Course,
+  CourseEnrollment,
+  CourseEnrollmentStatus,
+  CourseModule,
+} from '@prisma/client'
 
 import { db } from '@/lib/db'
 import { getProgress } from './get-progress'
@@ -6,7 +13,9 @@ import { getProgress } from './get-progress'
 export type CourseWithProgressAndCategory = Course & {
   category: Category | null
   chapters: Pick<Chapter, 'id'>[]
+  modules: Pick<CourseModule, 'id'>[]
   enrollments: Pick<CourseEnrollment, 'id' | 'status'>[]
+  _count: { modules: number }
   progress: number | null
   enrollmentStatus: CourseEnrollmentStatus | null
 }
@@ -37,6 +46,13 @@ export async function getCourses({
         chapters: {
           where: { isPublished: true },
           select: { id: true },
+        },
+        modules: {
+          where: { isPublished: true },
+          select: { id: true },
+        },
+        _count: {
+          select: { modules: true },
         },
         enrollments: {
           where: { userProfileId },

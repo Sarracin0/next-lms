@@ -32,9 +32,28 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
     return redirect('/manage/courses')
   }
 
-  const hasPublishedChapter = course.chapters.some((chapter) => chapter.isPublished)
-  const hasLessonMedia = course.chapters.some((chapter) => chapter.videoUrl || chapter.contentUrl)
-  const hasSupportingResources = course.attachments.length > 0
+  const courseModules = await db.courseModule.findMany({
+    where: { courseId: course.id },
+    orderBy: { position: 'asc' },
+    include: {
+      lessons: {
+        orderBy: { position: 'asc' },
+        include: {
+          blocks: {
+            orderBy: { position: 'asc' },
+          },
+        },
+      },
+    },
+  })
+  const lessons = courseModules.flatMap((module) => module.lessons)
+  const blocks = lessons.flatMap((lesson) => lesson.blocks)
+
+  const hasPublishedLesson = lessons.some((lesson) => lesson.isPublished)
+  const hasLessonMedia = blocks.some((block) => block.type === 'VIDEO_LESSON' && Boolean(block.videoUrl))
+  const hasSupportingResources =
+    course.attachments.length > 0 ||
+    blocks.some((block) => block.type === 'RESOURCES' && Boolean(block.contentUrl))
 
   const recommended = [
     {
@@ -47,7 +66,7 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
       id: 'lessons',
       label: 'At least one lesson published',
       helper: 'Keep lessons as drafts until ready',
-      isComplete: hasPublishedChapter,
+      isComplete: hasPublishedLesson,
     },
     {
       id: 'media',
@@ -76,6 +95,7 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
       <div className="p-6">
         <CourseBuilderWizard
           course={course}
+          modules={courseModules}
           courseId={course.id}
           completion={{
             completed: completedFields,

@@ -12,6 +12,13 @@ type EnrollmentWithCourse = Prisma.CourseEnrollmentGetPayload<{
           where: { isPublished: true }
           select: { id: true }
         }
+        modules: {
+          where: { isPublished: true },
+          select: { id: true }
+        }
+        _count: {
+          select: { modules: true }
+        }
       }
     }
   }
@@ -78,6 +85,13 @@ export async function getDashboardCourses(userProfileId: string): Promise<Dashbo
             chapters: {
               where: { isPublished: true },
               select: { id: true },
+            },
+            modules: {
+              where: { isPublished: true },
+              select: { id: true },
+            },
+            _count: {
+              select: { modules: true },
             },
           },
         },

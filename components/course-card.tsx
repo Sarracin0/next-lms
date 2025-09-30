@@ -17,13 +17,13 @@ type CourseCardProps = {
   id: string
   title: string
   imageUrl?: string | null
-  chaptersLength: number
+  moduleCount: number
   progress: number | null
   category?: string | null
   status?: CourseEnrollmentStatus | null
 }
 
-export default function CourseCard({ id, title, imageUrl, chaptersLength, progress, category, status }: CourseCardProps) {
+export default function CourseCard({ id, title, imageUrl, moduleCount, progress, category, status }: CourseCardProps) {
   return (
     <Link href={`/courses/${id}`}>
       <div className="group h-full overflow-hidden rounded-lg border bg-white p-3 transition hover:shadow-md">
@@ -46,7 +46,7 @@ export default function CourseCard({ id, title, imageUrl, chaptersLength, progre
             <div className="flex items-center gap-x-1 text-slate-500">
               <IconBadge size="sm" icon={BookOpenIcon} />
               <span>
-                {chaptersLength} {chaptersLength === 1 ? 'Chapter' : 'Chapters'}
+                {moduleCount} {moduleCount === 1 ? 'Module' : 'Modules'}
               </span>
             </div>
           </div>

@@ -7,6 +7,8 @@ type CourseListItem = {
   title: string
   imageUrl?: string | null
   chapters?: { id: string }[]
+  modules?: { id: string }[]
+  _count?: { modules?: number }
   category?: { name: string | null } | null
   progress: number | null
   enrollmentStatus?: CourseEnrollmentStatus | null
@@ -29,7 +31,7 @@ export default function CoursesList({ items, emptyState }: CoursesListProps) {
             imageUrl={course.imageUrl}
             progress={course.progress}
             status={course.enrollmentStatus}
-            chaptersLength={course.chapters?.length ?? 0}
+            moduleCount={course.modules?.length ?? course._count?.modules ?? course.chapters?.length ?? 0}
             category={course?.category?.name ?? undefined}
           />
         ))}

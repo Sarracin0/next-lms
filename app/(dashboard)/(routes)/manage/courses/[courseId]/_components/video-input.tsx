@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Upload, Link, Video, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,18 +18,26 @@ interface VideoInputProps {
 
 export const VideoInput = ({ value, onChange, className }: VideoInputProps) => {
   const [mode, setMode] = useState<VideoInputMode>('url')
+  const [urlValue, setUrlValue] = useState(value || '')
 
-  const handleUrlChange = (url: string) => {
-    onChange(url)
+  useEffect(() => {
+    setUrlValue(value || '')
+  }, [value])
+
+  const commitUrl = (url: string) => {
+    const trimmed = url.trim()
+    setUrlValue(trimmed)
+    onChange(trimmed)
   }
 
   const handleUploadComplete = (url?: string) => {
     if (url) {
-      onChange(url)
+      commitUrl(url)
     }
   }
 
   const clearVideo = () => {
+    setUrlValue('')
     onChange('')
   }
 
@@ -63,8 +71,15 @@ export const VideoInput = ({ value, onChange, className }: VideoInputProps) => {
       {mode === 'url' ? (
         <div className="space-y-2">
           <Input
-            value={value || ''}
-            onChange={(e) => handleUrlChange(e.target.value)}
+            value={urlValue}
+            onChange={(e) => setUrlValue(e.target.value)}
+            onBlur={() => commitUrl(urlValue)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitUrl(urlValue)
+              }
+            }}
             placeholder="Paste video URL (YouTube, Vimeo, etc.)"
           />
           {hasVideo && (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Plus, Trash2, Edit3, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -41,29 +41,39 @@ interface ModuleAccordionProps {
   module: Module
   onUpdateModule: (moduleId: string, data: Partial<Module>) => void
   onDeleteModule: (moduleId: string) => void
+  onPersistModule: (moduleId: string, overrides?: Partial<Module>) => void
   onAddLesson: (moduleId: string) => void
   onUpdateLesson: (moduleId: string, lessonId: string, data: Partial<Lesson>) => void
   onDeleteLesson: (moduleId: string, lessonId: string) => void
+  onPersistLesson: (moduleId: string, lessonId: string, overrides?: Partial<Lesson>) => void
   onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES') => void
   onUpdateBlock: (moduleId: string, lessonId: string, blockId: string, data: Partial<LessonBlock>) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
+  onPersistBlock: (moduleId: string, lessonId: string, blockId: string, overrides?: Partial<LessonBlock>) => void
 }
 
 export const ModuleAccordion = ({
   module,
   onUpdateModule,
   onDeleteModule,
+  onPersistModule,
   onAddLesson,
   onUpdateLesson,
   onDeleteLesson,
+  onPersistLesson,
   onAddBlock,
   onUpdateBlock,
   onDeleteBlock,
+  onPersistBlock,
 }: ModuleAccordionProps) => {
   // Stati di editing
   const [editingModule, setEditingModule] = useState<{ field: 'title' | 'description' | null }>({ field: null })
   const [editingLesson, setEditingLesson] = useState<{ id: string; field: 'title' | 'description' } | null>(null)
-  const [editingBlock, setEditingBlock] = useState<{ id: string; field: 'title' | 'content' | 'videoUrl' | 'contentUrl' } | null>(null)
+  const [editingBlock, setEditingBlock] = useState<{
+    lessonId: string
+    id: string
+    field: 'title' | 'content' | 'videoUrl' | 'contentUrl'
+  } | null>(null)
 
   // Stati degli accordion - sempre aperti di default per evitare problemi
   const [moduleOpen, setModuleOpen] = useState(true)
@@ -110,8 +120,17 @@ export const ModuleAccordion = ({
   }, [module.id, onUpdateModule])
 
   const handleModuleSave = useCallback(() => {
+    if (editingModule.field) {
+      onPersistModule(module.id)
+    }
     setEditingModule({ field: null })
-  }, [])
+  }, [editingModule.field, module.id, onPersistModule])
+
+  const handleModulePublishToggle = useCallback(() => {
+    const nextStatus = !module.isPublished
+    onUpdateModule(module.id, { isPublished: nextStatus })
+    onPersistModule(module.id, { isPublished: nextStatus })
+  }, [module.id, module.isPublished, onPersistModule, onUpdateModule])
 
   // Handlers per lesson
   const handleLessonEdit = useCallback((lessonId: string, field: 'title' | 'description') => {
@@ -125,21 +144,46 @@ export const ModuleAccordion = ({
   }, [module.id, onUpdateLesson])
 
   const handleLessonSave = useCallback(() => {
+    if (editingLesson) {
+      onPersistLesson(module.id, editingLesson.id)
+    }
     setEditingLesson(null)
-  }, [])
+  }, [editingLesson, module.id, onPersistLesson])
+
+  const handleLessonTogglePublish = useCallback(
+    (lessonId: string, nextStatus: boolean) => {
+      onUpdateLesson(module.id, lessonId, { isPublished: nextStatus })
+      onPersistLesson(module.id, lessonId, { isPublished: nextStatus })
+    },
+    [module.id, onPersistLesson, onUpdateLesson],
+  )
 
   // Handlers per block
-  const handleBlockEdit = useCallback((blockId: string, field: 'title' | 'content' | 'videoUrl' | 'contentUrl') => {
-    setEditingBlock({ id: blockId, field })
-  }, [])
+  const handleBlockEdit = useCallback(
+    (lessonId: string, blockId: string, field: 'title' | 'content' | 'videoUrl' | 'contentUrl') => {
+      setEditingBlock({ lessonId, id: blockId, field })
+    },
+    []
+  )
 
   const handleBlockUpdate = useCallback((lessonId: string, blockId: string, field: keyof LessonBlock, value: string | boolean) => {
     onUpdateBlock(module.id, lessonId, blockId, { [field]: value })
   }, [module.id, onUpdateBlock])
 
   const handleBlockSave = useCallback(() => {
+    if (editingBlock) {
+      onPersistBlock(module.id, editingBlock.lessonId, editingBlock.id)
+    }
     setEditingBlock(null)
-  }, [])
+  }, [editingBlock, module.id, onPersistBlock])
+
+  const handleBlockTogglePublish = useCallback(
+    (lessonId: string, blockId: string, nextStatus: boolean) => {
+      onUpdateBlock(module.id, lessonId, blockId, { isPublished: nextStatus })
+      onPersistBlock(module.id, lessonId, blockId, { isPublished: nextStatus })
+    },
+    [module.id, onPersistBlock, onUpdateBlock],
+  )
 
   // Gestione keyboard events
   const handleKeyDown = useCallback((e: React.KeyboardEvent, saveHandler: () => void) => {
@@ -193,6 +237,16 @@ export const ModuleAccordion = ({
           <Badge variant="outline" className="text-xs">
             {module.lessons.length} lesson{module.lessons.length !== 1 ? 's' : ''}
           </Badge>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleModulePublishToggle}
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+            title={module.isPublished ? 'Unpublish module' : 'Publish module'}
+            aria-label={module.isPublished ? 'Unpublish module' : 'Publish module'}
+          >
+            {module.isPublished ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -237,25 +291,27 @@ export const ModuleAccordion = ({
           {/* Lessons */}
           <div className="space-y-2">
             {module.lessons.map((lesson) => (
-              <LessonItem
-                key={lesson.id}
-                lesson={lesson}
-                moduleId={module.id}
-                isOpen={openLessons.has(lesson.id)}
-                editingLesson={editingLesson}
-                editingBlock={editingBlock}
-                onToggle={() => toggleLesson(lesson.id)}
-                onLessonEdit={handleLessonEdit}
-                onLessonUpdate={handleLessonUpdate}
-                onLessonSave={handleLessonSave}
-                onBlockEdit={handleBlockEdit}
-                onBlockUpdate={handleBlockUpdate}
-                onBlockSave={handleBlockSave}
-                onAddBlock={onAddBlock}
-                onDeleteLesson={onDeleteLesson}
-                onDeleteBlock={onDeleteBlock}
-                handleKeyDown={handleKeyDown}
-              />
+            <LessonItem
+              key={lesson.id}
+              lesson={lesson}
+              moduleId={module.id}
+              isOpen={openLessons.has(lesson.id)}
+              editingLesson={editingLesson}
+              editingBlock={editingBlock}
+              onToggle={() => toggleLesson(lesson.id)}
+              onLessonEdit={handleLessonEdit}
+              onLessonUpdate={handleLessonUpdate}
+              onLessonSave={handleLessonSave}
+              onLessonTogglePublish={handleLessonTogglePublish}
+              onBlockEdit={handleBlockEdit}
+              onBlockUpdate={handleBlockUpdate}
+              onBlockSave={handleBlockSave}
+              onBlockTogglePublish={handleBlockTogglePublish}
+              onAddBlock={onAddBlock}
+              onDeleteLesson={onDeleteLesson}
+              onDeleteBlock={onDeleteBlock}
+              handleKeyDown={handleKeyDown}
+            />
             ))}
           </div>
         </div>
@@ -270,14 +326,20 @@ interface LessonItemProps {
   moduleId: string
   isOpen: boolean
   editingLesson: { id: string; field: 'title' | 'description' } | null
-  editingBlock: { id: string; field: 'title' | 'content' | 'videoUrl' | 'contentUrl' } | null
+  editingBlock: {
+    lessonId: string
+    id: string
+    field: 'title' | 'content' | 'videoUrl' | 'contentUrl'
+  } | null
   onToggle: () => void
   onLessonEdit: (lessonId: string, field: 'title' | 'description') => void
   onLessonUpdate: (lessonId: string, field: keyof Lesson, value: string | boolean) => void
   onLessonSave: () => void
-  onBlockEdit: (blockId: string, field: 'title' | 'content' | 'videoUrl' | 'contentUrl') => void
+  onLessonTogglePublish: (lessonId: string, nextStatus: boolean) => void
+  onBlockEdit: (lessonId: string, blockId: string, field: 'title' | 'content' | 'videoUrl' | 'contentUrl') => void
   onBlockUpdate: (lessonId: string, blockId: string, field: keyof LessonBlock, value: string | boolean) => void
   onBlockSave: () => void
+  onBlockTogglePublish: (lessonId: string, blockId: string, nextStatus: boolean) => void
   onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES') => void
   onDeleteLesson: (moduleId: string, lessonId: string) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
@@ -294,9 +356,11 @@ const LessonItem = ({
   onLessonEdit,
   onLessonUpdate,
   onLessonSave,
+  onLessonTogglePublish,
   onBlockEdit,
   onBlockUpdate,
   onBlockSave,
+  onBlockTogglePublish,
   onAddBlock,
   onDeleteLesson,
   onDeleteBlock,
@@ -304,6 +368,14 @@ const LessonItem = ({
 }: LessonItemProps) => {
   const lessonInputRef = useRef<HTMLInputElement>(null)
   const lessonTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleLessonPublishToggle = () => {
+    onLessonTogglePublish(lesson.id, !lesson.isPublished)
+  }
+
+  const handleBlockPublishToggle = (blockId: string, currentStatus: boolean) => {
+    onBlockTogglePublish(lesson.id, blockId, !currentStatus)
+  }
 
   return (
     <div className="border border-border/40 rounded-lg">
@@ -347,6 +419,16 @@ const LessonItem = ({
           <Badge variant="outline" className="text-xs">
             {lesson.blocks.length} block{lesson.blocks.length !== 1 ? 's' : ''}
           </Badge>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleLessonPublishToggle}
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+            title={lesson.isPublished ? 'Unpublish lesson' : 'Publish lesson'}
+            aria-label={lesson.isPublished ? 'Unpublish lesson' : 'Publish lesson'}
+          >
+            {lesson.isPublished ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+          </Button>
         </div>
 
         <div className="flex items-center gap-1">
@@ -418,12 +500,12 @@ const LessonItem = ({
             {lesson.blocks.map((block) => (
               <div key={block.id} className="bg-muted/30 rounded-md p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {block.type === 'VIDEO_LESSON' ? 'Video' : 'Resources'}
-                    </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    {block.type === 'VIDEO_LESSON' ? 'Video' : 'Resources'}
+                  </Badge>
 
-                    {editingBlock?.id === block.id && editingBlock.field === 'title' ? (
+                    {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'title' ? (
                       <Input
                         value={block.title}
                         onChange={(e) => onBlockUpdate(lesson.id, block.id, 'title', e.target.value)}
@@ -435,7 +517,7 @@ const LessonItem = ({
                     ) : (
                       <span
                         className="text-sm font-medium cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => onBlockEdit(block.id, 'title')}
+                        onClick={() => onBlockEdit(lesson.id, block.id, 'title')}
                       >
                         {block.title}
                       </span>
@@ -444,13 +526,23 @@ const LessonItem = ({
                     <Badge variant={block.isPublished ? 'default' : 'secondary'} className="text-xs">
                       {block.isPublished ? 'Published' : 'Draft'}
                     </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleBlockPublishToggle(block.id, block.isPublished)}
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                      title={block.isPublished ? 'Unpublish block' : 'Publish block'}
+                      aria-label={block.isPublished ? 'Unpublish block' : 'Publish block'}
+                    >
+                      {block.isPublished ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                    </Button>
                   </div>
 
                   <div className="flex items-center gap-1">
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => onBlockEdit(block.id, 'title')}
+                      onClick={() => onBlockEdit(lesson.id, block.id, 'title')}
                       className="h-6 w-6 p-0"
                     >
                       <Edit3 className="h-3 w-3" />
@@ -474,7 +566,7 @@ const LessonItem = ({
                       onChange={(url) => onBlockUpdate(lesson.id, block.id, 'videoUrl', url)}
                       className="text-xs"
                     />
-                    {editingBlock?.id === block.id && editingBlock.field === 'content' ? (
+                    {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'content' ? (
                       <Textarea
                         value={block.content || ''}
                         onChange={(e) => onBlockUpdate(lesson.id, block.id, 'content', e.target.value)}
@@ -487,7 +579,7 @@ const LessonItem = ({
                     ) : (
                       <p
                         className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => onBlockEdit(block.id, 'content')}
+                        onClick={() => onBlockEdit(lesson.id, block.id, 'content')}
                       >
                         {block.content || 'Click to add description...'}
                       </p>
@@ -495,7 +587,7 @@ const LessonItem = ({
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {editingBlock?.id === block.id && editingBlock.field === 'contentUrl' ? (
+                    {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'contentUrl' ? (
                       <Input
                         value={block.contentUrl || ''}
                         onChange={(e) => onBlockUpdate(lesson.id, block.id, 'contentUrl', e.target.value)}
@@ -508,13 +600,13 @@ const LessonItem = ({
                     ) : (
                       <p
                         className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => onBlockEdit(block.id, 'contentUrl')}
+                        onClick={() => onBlockEdit(lesson.id, block.id, 'contentUrl')}
                       >
                         {block.contentUrl || 'Click to add resource URL...'}
                       </p>
                     )}
 
-                    {editingBlock?.id === block.id && editingBlock.field === 'content' ? (
+                    {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'content' ? (
                       <Textarea
                         value={block.content || ''}
                         onChange={(e) => onBlockUpdate(lesson.id, block.id, 'content', e.target.value)}
@@ -527,7 +619,7 @@ const LessonItem = ({
                     ) : (
                       <p
                         className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => onBlockEdit(block.id, 'content')}
+                        onClick={() => onBlockEdit(lesson.id, block.id, 'content')}
                       >
                         {block.content || 'Click to add description...'}
                       </p>
