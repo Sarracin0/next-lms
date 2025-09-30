@@ -119,3 +119,16 @@ body,
     height: 0;
   }
 }
+
+@keyframes gradient {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-gradient {
+  animation: gradient 8s ease-in-out infinite;
+}
