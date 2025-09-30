@@ -2,10 +2,12 @@
 
 ## Panoramica delle Modifiche
 
-Sono state implementate due importanti migliorie al wizard di creazione corsi:
+Sono state implementate quattro importanti migliorie al wizard di creazione corsi:
 
-1. **Upload Video**: Opzione per caricare file video oltre all'inserimento di URL
-2. **Fix Accordion Bug**: Risoluzione del problema di chiusura accordion durante la digitazione
+1. **Upload Video**: Opzione per caricare file video oltre all'inserimento di URL.
+2. **Fix Accordion Bug**: Risoluzione del problema di chiusura accordion durante la digitazione.
+3. **Persistenza completa**: CRUD per moduli, lezioni e blocchi con salvataggio immediato su Prisma.
+4. **Toggle Publish Gerarchico**: Azioni esplicite per marcare draft/published lungo tutta la gerarchia.
 
 ## 🎥 Funzionalità Upload Video
 
@@ -107,6 +109,41 @@ if (isEditingModule || editingLesson || editingBlock) {
 }
 ```
 
+## 💾 Persistenza & API
+
+### Cosa è stato fatto
+- Collegamento diretto tra UI e API REST (`app/api/courses/[courseId]/modules/**`).
+- Stato locale aggiornato in modo ottimistico e persistito su ogni blur/toggle.
+- Sincronizzazione legacy automatica per mantenere la tabella `Chapter` allineata.
+
+### Endpoints Principali
+- `POST /modules`
+- `PATCH` / `DELETE /modules/[moduleId]`
+- `POST /modules/[moduleId]/lessons`
+- `PATCH` / `DELETE /modules/[moduleId]/lessons/[lessonId]`
+- `POST /modules/[moduleId]/lessons/[lessonId]/blocks`
+- `PATCH` / `DELETE /modules/[moduleId]/lessons/[lessonId]/blocks/[blockId]`
+
+Ogni rotta impone ruolo (`HR_ADMIN` o `TRAINER`) e ownership del corso.
+
+### Bridge Legacy
+- Campo `LessonBlock.legacyChapterId` per collegare blocchi video a `Chapter`.
+- Helper `lib/sync-legacy-chapter.ts` invocato da tutte le mutazioni pertinenti.
+- Script one-shot: `pnpm tsx scripts/sync-legacy-chapters.ts`.
+- Comandi ricorrenti: `npx prisma migrate deploy` + `npx prisma generate`.
+- Un capitolo è pubblicato solo se corso, modulo, lezione e blocco sono `isPublished = true`.
+
+## 👁️ Toggle Publish Gerarchico
+
+### Interazione UI
+- Icone `Eye/EyeOff` su modulo, lezione e blocco dentro `ModuleAccordion`.
+- Aggiornamento immediato dello stato locale e chiamata `PATCH` con il nuovo flag.
+- Toast di conferma per feedback utente.
+
+### Impatto Backend
+- Il toggle dei blocchi video aggiorna o rimuove il relativo `Chapter`.
+- Il toggle del corso (`publish/unpublish`) richiama `syncLegacyChaptersForCourse` per riallineare l'intera gerarchia.
+
 ## 🎯 Risultati Ottenuti
 
 ### Upload Video
@@ -120,6 +157,12 @@ if (isEditingModule || editingLesson || editingBlock) {
 - ✅ **Focus Management**: Gestione corretta del focus per tutti gli input
 - ✅ **State Persistence**: Gli stati di apertura sono mantenuti durante l'editing
 - ✅ **Keyboard Support**: Supporto completo per Escape e Enter
+
+### Persistenza & Publish
+- ✅ **Salvataggio Immediato**: Moduli, lezioni e blocchi vengono scritti su Prisma con feedback realtime.
+- ✅ **Bridge Legacy**: I blocchi video popolano automaticamente `Chapter`, mantenendo la library attuale.
+- ✅ **Toggle Consistenti**: I pulsanti publish/unpublish propagano lo stato lungo tutta la gerarchia.
+- ✅ **Reversibilità**: Eliminazioni puliscono anche i capitoli legacy associati.
 
 ## 🔍 Spiegazione Tecnica del Bug
 
@@ -138,16 +181,18 @@ if (isEditingModule || editingLesson || editingBlock) {
 ## 📁 File Modificati
 
 - ✅ **`video-input.tsx`**: Nuovo componente per gestione video
-- ✅ **`module-accordion.tsx`**: Refactoring completo per fix bug accordion
-- ✅ **Integrazione**: VideoInput integrato nei blocchi VIDEO_LESSON
+- ✅ **`module-accordion.tsx`**: Refactoring completo + toggle publish + integrazione `VideoInput`
+- ✅ **`curriculum-manager.tsx`**: Stato centralizzato + orchestrazione chiamate API
+- ✅ **`app/api/courses/[courseId]/modules/**`**: CRUD completo con sync legacy
+- ✅ **`lib/sync-legacy-chapter.ts` & migrazione**: Bridge verso `Chapter`
 
 ## 🚀 Benefici
 
 1. **UX Migliorata**: Editing fluido senza interruzioni
 2. **Flessibilità Video**: Supporto completo per upload e URL
-3. **Stabilità**: Nessuna perdita di stato durante l'editing
-4. **Performance**: Gestione ottimizzata degli stati e re-rendering
-5. **Accessibilità**: Supporto keyboard completo (Escape, Enter)
+3. **Persistenza Affidabile**: Dati salvati in tempo reale con feedback chiaro
+4. **Compatibilità Learner**: I contenuti appaiono subito nella library attuale
+5. **Performance**: Gestione ottimizzata degli stati e re-rendering
+6. **Accessibilità**: Supporto keyboard completo (Escape, Enter)
 
 Le modifiche mantengono la compatibilità con la struttura esistente mentre offrono un'esperienza utente significativamente migliorata! 🎉
-

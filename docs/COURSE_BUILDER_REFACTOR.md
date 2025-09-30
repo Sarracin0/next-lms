@@ -156,6 +156,38 @@ Course
 - ARIA labels per screen readers
 - Focus management per editing inline
 
+## Persistenza e API
+
+### Flusso Dati
+1. **Client (CurriculumManager/ModuleAccordion)** aggiorna lo stato locale e chiama le API via `axios`.
+2. **API Next.js** in `app/api/courses/[courseId]/modules/**` validano ruolo, proprietà del corso e orchestrano le mutazioni Prisma.
+3. **Bridge legacy** sincronizza i blocchi video con la tabella `Chapter` per mantenere compatibile l'esperienza learner esistente.
+4. **Learner UI** continua a leggere i `Chapter` pubblicati, trovando i dati duplicati automaticamente.
+
+### Endpoints Principali
+- `POST /api/courses/[courseId]/modules`
+- `PATCH /api/courses/[courseId]/modules/[moduleId]`
+- `DELETE /api/courses/[courseId]/modules/[moduleId]`
+- `POST /api/courses/[courseId]/modules/[moduleId]/lessons`
+- `PATCH /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]`
+- `DELETE /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]`
+- `POST /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]/blocks`
+- `PATCH /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]/blocks/[blockId]`
+- `DELETE /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]/blocks/[blockId]`
+
+Tutte richiedono ruolo `HR_ADMIN` o `TRAINER` e verificano che il trainer sia autore del corso.
+
+### Bridge Legacy → Chapter
+- **Schema**: campo opzionale `legacyChapterId` su `LessonBlock` (migrazione `20250116000000_sync_lesson_blocks_to_chapters`).
+- **Helpers**: `lib/sync-legacy-chapter.ts` sincronizza singolo blocco, lezione, modulo o corso.
+- **Trigger automatici**: ogni mutazione dei blocchi video e dei flag `isPublished` invoca la sincronizzazione.
+- **Script di backfill**: `scripts/sync-legacy-chapters.ts` popola i capitoli esistenti.
+- **Comandi operativi**:
+  - `npx prisma migrate deploy`
+  - `npx prisma generate`
+  - `pnpm tsx scripts/sync-legacy-chapters.ts`
+- **Logica publish**: un capitolo è pubblicato solo se corso, modulo, lezione e blocco sono tutti `isPublished = true`. I toggle UI propagano il valore tramite `PATCH`.
+
 ## Prossimi Passi
 
 1. **Implementazione API**: Creare endpoint per CRUD operations

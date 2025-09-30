@@ -1,0 +1,71 @@
+# Course Builder – Operational Playbook
+
+## Perché serve
+La nuova gerarchia (Course → Module → Lesson → LessonBlock) funziona insieme all'esperienza learner legacy basata su `Chapter`. Questo documento spiega come manutenere l'infrastruttura, applicare migrazioni e risolvere i problemi più comuni.
+
+## Struttura & Bridge
+- Ogni blocco video (`LessonBlock` con `type = VIDEO_LESSON`) viene duplicato nella tabella `Chapter`.
+- La colonna `LessonBlock.legacyChapterId` crea il legame 1–1 con il capitolo generato.
+- Le funzioni in `lib/sync-legacy-chapter.ts` sincronizzano blocchi, lezioni, moduli o l'intero corso.
+- I toggle publish propagano `isPublished` lungo tutta la catena; un capitolo legacy è visibile solo quando **corso, modulo, lezione e blocco** sono pubblicati.
+
+## Comandi chiave
+```bash
+# Applica le migrazioni mancanti sul database (Railway o simili)
+npx prisma migrate deploy
+
+# Rigenera il client Prisma
+npx prisma generate
+
+# Backfill/risincronizza tutti i blocchi video -> Chapter
+pnpm tsx scripts/sync-legacy-chapters.ts
+```
+
+> Suggerimento: aggiungi `tsx` tra le devDependency (`pnpm add -D tsx`) se non è già presente.
+
+## Quando eseguire lo script di sync
+| Scenario | Azione |
+| --- | --- |
+| Nuova installazione / DB pulito | Esegui il backfill dopo la migrazione |
+| Import massivo di corsi | Esegui il backfill al termine dell'import |
+| Debug “nessun capitolo visibile” | Rilancia lo script e verifica i toggle publish |
+
+Lo script è idempotente: può essere eseguito più volte senza effetti collaterali.
+
+## Nuove API (riassunto)
+| Rotta | Descrizione |
+| --- | --- |
+| `POST /api/courses/[courseId]/modules` | Crea modulo |
+| `PATCH /api/courses/[courseId]/modules/[moduleId]` | Aggiorna modulo + sync legacy |
+| `DELETE /api/courses/[courseId]/modules/[moduleId]` | Rimuove modulo e capitoli associati |
+| `POST /api/courses/[courseId]/modules/[moduleId]/lessons` | Crea lezione |
+| `PATCH /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]` | Aggiorna lezione + sync |
+| `DELETE /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]` | Rimuove lezione + capitoli |
+| `POST /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]/blocks` | Aggiunge blocco |
+| `PATCH /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]/blocks/[blockId]` | Aggiorna blocco + capitolo |
+| `DELETE /api/courses/[courseId]/modules/[moduleId]/lessons/[lessonId]/blocks/[blockId]` | Cancella blocco + capitolo |
+
+Tutte richiedono ruoli `HR_ADMIN` o `TRAINER` e verificano che il corso appartenga al trainer (se non admin).
+
+## Verifiche consigliate
+1. **Curriculum Builder**
+   - Crea modulo → lezione → blocco video e risorsa.
+   - Verifica i toast e che i toggle publish restino coerenti dopo il refresh.
+2. **Learning Library**
+   - Controlla che il modulo appena pubblicato appaia nella card (`Modules N`).
+   - Apri il corso: deve esistere almeno un capitolo e non reindirizzare a `/courses`.
+3. **Legacy fallback**
+   - Se i capitoli mancano, verifica `LessonBlock.legacyChapterId` e rilancia lo script di sync.
+
+## Troubleshooting rapido
+- **Errore Prisma P3006 / shadow DB**: usa `npx prisma migrate deploy` oppure configura `SHADOW_DATABASE_URL` per `migrate dev`.
+- **`ts-node` non trovato**: usa `pnpm tsx` oppure installa `ts-node` come devDependency.
+- **Blocco pubblicato ma non visibile**: assicurati che corso/modulo/lezione siano `isPublished = true`, poi esegui lo script di sync.
+
+## Roadmap futura
+- Rimuovere il bridge verso `Chapter` quando la learner experience consumerà direttamente moduli/lezioni/blocchi.
+- Aggiungere test e2e per garantire la sincronizzazione automatica in CI.
+- Introdurre permessi granulari (es. edit-only per trainer) e drag&drop.
+
+---
+Per domande o proposte di estensioni, apri una issue dedicata o ping il team LMS nel canale interno.
