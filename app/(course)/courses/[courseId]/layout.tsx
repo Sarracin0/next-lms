@@ -39,6 +39,9 @@ export default async function CourseLayout({ children, params }: CourseLayoutPro
             include: {
               blocks: {
                 where: { isPublished: true },
+                include: {
+                  liveSession: { select: { meetingUrl: true } },
+                },
                 orderBy: { position: 'asc' },
               },
               progress: { where: { userProfileId: profile.id } },

@@ -8,6 +8,7 @@ export type BlockData = {
   isPublished: boolean
   legacyChapterId?: string | null
   contentUrl?: string | null
+  liveSession?: { meetingUrl: string | null } | null
 }
 
 export type LessonWithBlocks = {

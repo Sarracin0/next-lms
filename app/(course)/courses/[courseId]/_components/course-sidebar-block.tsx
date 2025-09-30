@@ -59,16 +59,19 @@ export default function CourseSidebarBlock({ block, lessonId, courseId, isLocked
         return
       }
       case 'LIVE_SESSION': {
-        // Preferisci la chapter legacy (mostra scheda aula virtuale); fallback al link diretto
+        // Preferisci la chapter legacy (mostra scheda aula virtuale)
         if (block.legacyChapterId) {
           router.push(`/courses/${courseId}/chapters/${block.legacyChapterId}`)
           return
         }
-        if (block.contentUrl) {
-          window.open(block.contentUrl, '_blank', 'noopener,noreferrer')
+        // Poi prova il link diretto: prima contentUrl, poi liveSession.meetingUrl
+        const joinUrl = block.contentUrl || block.liveSession?.meetingUrl
+        if (joinUrl) {
+          window.open(joinUrl, '_blank', 'noopener,noreferrer')
           return
         }
-        router.push(`/courses/${courseId}`)
+        // In ultima istanza apri la lista delle live sessions (mock)
+        router.push(`/live-sessions`)
         return
       }
       default: {
