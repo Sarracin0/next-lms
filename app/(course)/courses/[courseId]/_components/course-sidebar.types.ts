@@ -7,6 +7,7 @@ export type BlockData = {
   position: number
   isPublished: boolean
   legacyChapterId?: string | null
+  contentUrl?: string | null
 }
 
 export type LessonWithBlocks = {

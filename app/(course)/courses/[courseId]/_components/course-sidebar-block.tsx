@@ -42,11 +42,44 @@ export default function CourseSidebarBlock({ block, lessonId, courseId, isLocked
 
   const onClick = () => {
     if (isLocked) return
-    // Se disponibile, usa la chapter legacy sincronizzata dal blocco; fallback alla root del corso
-    if (block.legacyChapterId) {
-      router.push(`/courses/${courseId}/chapters/${block.legacyChapterId}`)
-    } else {
-      router.push(`/courses/${courseId}`)
+
+    // Comportamento per tipo di blocco
+    switch (block.type) {
+      case 'RESOURCES': {
+        // Apri direttamente la risorsa se disponibile; altrimenti prova la chapter legacy
+        if (block.contentUrl) {
+          window.open(block.contentUrl, '_blank', 'noopener,noreferrer')
+          return
+        }
+        if (block.legacyChapterId) {
+          router.push(`/courses/${courseId}/chapters/${block.legacyChapterId}`)
+          return
+        }
+        router.push(`/courses/${courseId}`)
+        return
+      }
+      case 'LIVE_SESSION': {
+        // Preferisci la chapter legacy (mostra scheda aula virtuale); fallback al link diretto
+        if (block.legacyChapterId) {
+          router.push(`/courses/${courseId}/chapters/${block.legacyChapterId}`)
+          return
+        }
+        if (block.contentUrl) {
+          window.open(block.contentUrl, '_blank', 'noopener,noreferrer')
+          return
+        }
+        router.push(`/courses/${courseId}`)
+        return
+      }
+      default: {
+        // VIDEO_LESSON (o default): vai alla chapter legacy se presente
+        if (block.legacyChapterId) {
+          router.push(`/courses/${courseId}/chapters/${block.legacyChapterId}`)
+          return
+        }
+        router.push(`/courses/${courseId}`)
+        return
+      }
     }
   }
 
