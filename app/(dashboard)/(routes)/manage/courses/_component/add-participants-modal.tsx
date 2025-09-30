@@ -137,7 +137,7 @@ export function AddParticipantsModal({ courseId, isOpen, onClose, onSuccess }: A
       if (!response.ok) throw new Error('Errore nel caricamento dei partecipanti')
       
       const data = await response.json()
-      setEnrolledParticipants(data.participants || [])
+      setEnrolledParticipants(data.enrollments || [])
     } catch (error) {
       console.error('Errore nel caricamento dei partecipanti:', error)
       toast.error('Errore nel caricamento dei partecipanti iscritti')
