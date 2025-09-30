@@ -42,8 +42,12 @@ export default function CourseSidebarBlock({ block, lessonId, courseId, isLocked
 
   const onClick = () => {
     if (isLocked) return
-    // Naviga alla route del blocco (da implementare nel routing)
-    router.push(`/courses/${courseId}/lessons/${lessonId}/blocks/${block.id}`)
+    // Se disponibile, usa la chapter legacy sincronizzata dal blocco; fallback alla root del corso
+    if (block.legacyChapterId) {
+      router.push(`/courses/${courseId}/chapters/${block.legacyChapterId}`)
+    } else {
+      router.push(`/courses/${courseId}`)
+    }
   }
 
   return (

@@ -197,6 +197,7 @@ model Course {
   description              String?
   imageUrl                 String?
   isPublished              Boolean  @default(false)
+  isLeaderboardEnabled     Boolean  @default(false)
   estimatedDurationMinutes Int?
   level                    String?
   learningOutcomes         String?

@@ -6,6 +6,7 @@ export type BlockData = {
   type: string
   position: number
   isPublished: boolean
+  legacyChapterId?: string | null
 }
 
 export type LessonWithBlocks = {
