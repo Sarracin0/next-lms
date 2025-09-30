@@ -39,9 +39,9 @@ export const SidebarRoutes = () => {
   const canManage = profile.role === 'HR_ADMIN' || profile.role === 'TRAINER'
 
   return (
-    <div className="flex w-full flex-col gap-y-4">
-      <div className="flex flex-col">
-        <span className="px-6 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="flex w-full flex-col gap-8 py-2">
+      <div className="flex flex-col gap-1">
+        <span className="px-6 pb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
           Learning
         </span>
         {learnerRoutes.map((route) => (
@@ -49,8 +49,8 @@ export const SidebarRoutes = () => {
         ))}
       </div>
       {canManage ? (
-        <div className="flex flex-col">
-          <span className="px-6 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="flex flex-col gap-1">
+          <span className="px-6 pb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
             Manage
           </span>
           {managementRoutes.map((route) => (
