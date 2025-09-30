@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, Edit3, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { VideoInput } from './video-input'
 import { cn } from '@/lib/utils'
 
 export type Module = {
@@ -69,30 +70,68 @@ export const ModuleAccordion = ({
   const [isEditingModule, setIsEditingModule] = useState(false)
   const [editingLesson, setEditingLesson] = useState<string | null>(null)
   const [editingBlock, setEditingBlock] = useState<string | null>(null)
+  
+  // Stati per gestire l'apertura degli accordion e prevenire chiusura durante l'editing
+  const [openModuleId, setOpenModuleId] = useState<string | null>(module.id)
+  const [openLessonId, setOpenLessonId] = useState<string | null>(null)
+  
+  // Refs per gestire il focus e prevenire chiusura accidentale
+  const moduleInputRef = useRef<HTMLInputElement>(null)
+  const lessonInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
+  const blockInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
 
+  // Gestione aggiornamenti con prevenzione chiusura accordion
   const handleModuleUpdate = (field: keyof Module, value: string | boolean) => {
     onUpdateModule(module.id, { [field]: value })
+    // Non chiudere l'editing immediatamente per evitare chiusura accordion
     if (field === 'title' || field === 'description') {
-      setIsEditingModule(false)
+      // Delay per permettere al componente di stabilizzarsi
+      setTimeout(() => setIsEditingModule(false), 100)
     }
   }
 
   const handleLessonUpdate = (lessonId: string, field: keyof Lesson, value: string | boolean) => {
     onUpdateLesson(module.id, lessonId, { [field]: value })
+    // Mantieni aperto l'accordion della lezione durante l'editing
+    setOpenLessonId(lessonId)
     if (field === 'title' || field === 'description') {
-      setEditingLesson(null)
+      setTimeout(() => setEditingLesson(null), 100)
     }
   }
 
   const handleBlockUpdate = (lessonId: string, blockId: string, field: keyof LessonBlock, value: string | boolean) => {
     onUpdateBlock(module.id, lessonId, blockId, { [field]: value })
+    // Mantieni aperto l'accordion della lezione durante l'editing del blocco
+    setOpenLessonId(lessonId)
     if (field === 'title' || field === 'content') {
-      setEditingBlock(null)
+      setTimeout(() => setEditingBlock(null), 100)
     }
   }
 
+  // Gestione focus per prevenire chiusura accidentale
+  const handleModuleFocus = () => {
+    setOpenModuleId(module.id)
+  }
+
+  const handleLessonFocus = (lessonId: string) => {
+    setOpenLessonId(lessonId)
+    setOpenModuleId(module.id)
+  }
+
   return (
-    <Accordion type="single" collapsible className="w-full">
+    <Accordion 
+      type="single" 
+      collapsible 
+      className="w-full"
+      value={openModuleId === module.id ? module.id : undefined}
+      onValueChange={(value) => {
+        // Prevenire chiusura se stiamo editando
+        if (isEditingModule || editingLesson || editingBlock) {
+          return
+        }
+        setOpenModuleId(value === module.id ? module.id : null)
+      }}
+    >
       <AccordionItem value={module.id} className="border border-border/60 rounded-lg">
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
           <div className="flex items-center justify-between w-full mr-4">
@@ -102,11 +141,18 @@ export const ModuleAccordion = ({
                 <span className="font-semibold text-foreground">
                   {isEditingModule ? (
                     <Input
+                      ref={moduleInputRef}
                       value={module.title}
                       onChange={(e) => handleModuleUpdate('title', e.target.value)}
-                      onBlur={() => setIsEditingModule(false)}
+                      onFocus={handleModuleFocus}
+                      onBlur={() => {
+                        // Delay per permettere al click di completarsi
+                        setTimeout(() => setIsEditingModule(false), 150)
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
+                          setIsEditingModule(false)
+                        } else if (e.key === 'Escape') {
                           setIsEditingModule(false)
                         }
                       }}
@@ -114,7 +160,13 @@ export const ModuleAccordion = ({
                       autoFocus
                     />
                   ) : (
-                    <span onClick={() => setIsEditingModule(true)} className="cursor-pointer">
+                    <span 
+                      onClick={() => {
+                        setIsEditingModule(true)
+                        setOpenModuleId(module.id)
+                      }} 
+                      className="cursor-pointer"
+                    >
                       {module.title}
                     </span>
                   )}
@@ -172,14 +224,25 @@ export const ModuleAccordion = ({
                 <Textarea
                   value={module.description || ''}
                   onChange={(e) => handleModuleUpdate('description', e.target.value)}
-                  onBlur={() => setIsEditingModule(false)}
+                  onFocus={handleModuleFocus}
+                  onBlur={() => {
+                    setTimeout(() => setIsEditingModule(false), 150)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setIsEditingModule(false)
+                    }
+                  }}
                   placeholder="Module description..."
                   className="min-h-[60px] text-sm"
                 />
               ) : (
                 <p
                   className="text-sm text-muted-foreground cursor-pointer"
-                  onClick={() => setIsEditingModule(true)}
+                  onClick={() => {
+                    setIsEditingModule(true)
+                    setOpenModuleId(module.id)
+                  }}
                 >
                   {module.description || 'Click to add description...'}
                 </p>
@@ -190,7 +253,18 @@ export const ModuleAccordion = ({
             <div className="space-y-2">
               {module.lessons.map((lesson) => (
                 <div key={lesson.id} className="border border-border/40 rounded-lg">
-                  <Accordion type="single" collapsible>
+                  <Accordion 
+                    type="single" 
+                    collapsible
+                    value={openLessonId === lesson.id ? lesson.id : undefined}
+                    onValueChange={(value) => {
+                      // Prevenire chiusura se stiamo editando
+                      if (editingLesson === lesson.id || editingBlock) {
+                        return
+                      }
+                      setOpenLessonId(value === lesson.id ? lesson.id : null)
+                    }}
+                  >
                     <AccordionItem value={lesson.id} className="border-0">
                       <AccordionTrigger className="px-3 py-2 hover:no-underline">
                         <div className="flex items-center justify-between w-full mr-4">
@@ -199,11 +273,19 @@ export const ModuleAccordion = ({
                             <span className="text-sm font-medium">
                               {editingLesson === lesson.id ? (
                                 <Input
+                                  ref={(el) => {
+                                    lessonInputRefs.current[lesson.id] = el
+                                  }}
                                   value={lesson.title}
                                   onChange={(e) => handleLessonUpdate(lesson.id, 'title', e.target.value)}
-                                  onBlur={() => setEditingLesson(null)}
+                                  onFocus={() => handleLessonFocus(lesson.id)}
+                                  onBlur={() => {
+                                    setTimeout(() => setEditingLesson(null), 150)
+                                  }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
+                                      setEditingLesson(null)
+                                    } else if (e.key === 'Escape') {
                                       setEditingLesson(null)
                                     }
                                   }}
@@ -212,7 +294,10 @@ export const ModuleAccordion = ({
                                 />
                               ) : (
                                 <span
-                                  onClick={() => setEditingLesson(lesson.id)}
+                                  onClick={() => {
+                                    setEditingLesson(lesson.id)
+                                    handleLessonFocus(lesson.id)
+                                  }}
                                   className="cursor-pointer"
                                 >
                                   {lesson.title}
@@ -282,14 +367,25 @@ export const ModuleAccordion = ({
                               <Textarea
                                 value={lesson.description || ''}
                                 onChange={(e) => handleLessonUpdate(lesson.id, 'description', e.target.value)}
-                                onBlur={() => setEditingLesson(null)}
+                                onFocus={() => handleLessonFocus(lesson.id)}
+                                onBlur={() => {
+                                  setTimeout(() => setEditingLesson(null), 150)
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Escape') {
+                                    setEditingLesson(null)
+                                  }
+                                }}
                                 placeholder="Lesson description..."
                                 className="min-h-[40px] text-xs"
                               />
                             ) : (
                               <p
                                 className="text-xs text-muted-foreground cursor-pointer"
-                                onClick={() => setEditingLesson(lesson.id)}
+                                onClick={() => {
+                                  setEditingLesson(lesson.id)
+                                  handleLessonFocus(lesson.id)
+                                }}
                               >
                                 {lesson.description || 'Click to add description...'}
                               </p>
@@ -308,11 +404,19 @@ export const ModuleAccordion = ({
                                     <span className="text-sm font-medium">
                                       {editingBlock === block.id ? (
                                         <Input
+                                          ref={(el) => {
+                                            blockInputRefs.current[block.id] = el
+                                          }}
                                           value={block.title}
                                           onChange={(e) => handleBlockUpdate(lesson.id, block.id, 'title', e.target.value)}
-                                          onBlur={() => setEditingBlock(null)}
+                                          onFocus={() => handleLessonFocus(lesson.id)}
+                                          onBlur={() => {
+                                            setTimeout(() => setEditingBlock(null), 150)
+                                          }}
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
+                                              setEditingBlock(null)
+                                            } else if (e.key === 'Escape') {
                                               setEditingBlock(null)
                                             }
                                           }}
@@ -321,7 +425,10 @@ export const ModuleAccordion = ({
                                         />
                                       ) : (
                                         <span
-                                          onClick={() => setEditingBlock(block.id)}
+                                          onClick={() => {
+                                            setEditingBlock(block.id)
+                                            handleLessonFocus(lesson.id)
+                                          }}
                                           className="cursor-pointer"
                                         >
                                           {block.title}
@@ -357,10 +464,11 @@ export const ModuleAccordion = ({
                                   <div className="mt-2 space-y-2">
                                     {block.type === 'VIDEO_LESSON' ? (
                                       <div className="space-y-2">
-                                        <Input
-                                          placeholder="Video URL"
+                                        {/* Video Input con opzioni Upload/URL */}
+                                        <VideoInput
                                           value={block.videoUrl || ''}
-                                          onChange={(e) => handleBlockUpdate(lesson.id, block.id, 'videoUrl', e.target.value)}
+                                          onChange={(url) => handleBlockUpdate(lesson.id, block.id, 'videoUrl', url)}
+                                          placeholder="Video URL or upload"
                                           className="text-xs"
                                         />
                                         <Textarea
