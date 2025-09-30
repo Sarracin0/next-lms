@@ -50,7 +50,10 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
   const blocks = lessons.flatMap((lesson) => lesson.blocks)
 
   const hasPublishedLesson = lessons.some((lesson) => lesson.isPublished)
-  const hasLessonMedia = blocks.some((block) => block.type === 'VIDEO_LESSON' && Boolean(block.videoUrl))
+  const hasLessonMedia = blocks.some(
+    (block) =>
+      (block.type === 'VIDEO_LESSON' && Boolean(block.videoUrl)) || block.type === 'LIVE_SESSION',
+  )
   const hasSupportingResources =
     course.attachments.length > 0 ||
     blocks.some((block) => block.type === 'RESOURCES' && Boolean(block.contentUrl))

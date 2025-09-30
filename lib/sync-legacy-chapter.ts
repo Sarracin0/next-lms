@@ -1,4 +1,4 @@
-import { BlockType, type LessonBlock } from '@prisma/client'
+import { BlockType } from '@prisma/client'
 
 import { db } from './db'
 
@@ -29,7 +29,10 @@ export async function syncLegacyChapterForBlock(blockId: string) {
     return
   }
 
-  if (block.type !== BlockType.VIDEO_LESSON) {
+  const isSyncableBlock =
+    block.type === BlockType.VIDEO_LESSON || block.type === BlockType.LIVE_SESSION
+
+  if (!isSyncableBlock) {
     if (block.legacyChapterId) {
       await db.chapter.delete({ where: { id: block.legacyChapterId } }).catch(() => undefined)
       await db.lessonBlock.update({ where: { id: block.id }, data: { legacyChapterId: null } })
@@ -43,8 +46,11 @@ export async function syncLegacyChapterForBlock(blockId: string) {
     title: block.title,
     description: block.content ?? lesson.description ?? module.description ?? null,
     position: computeChapterPosition(module.position ?? 0, lesson.position ?? 0, block.position ?? 0),
-    videoUrl: block.videoUrl ?? null,
-    contentUrl: block.contentUrl ?? null,
+    videoUrl: block.type === BlockType.VIDEO_LESSON ? block.videoUrl ?? null : null,
+    contentUrl:
+      block.type === BlockType.VIDEO_LESSON
+        ? block.contentUrl ?? null
+        : block.contentUrl ?? null,
     isPublished:
       Boolean(block.isPublished) && Boolean(lesson.isPublished) && Boolean(module.isPublished) && Boolean(module.course.isPublished),
     isPreview: lesson.isPreview ?? false,

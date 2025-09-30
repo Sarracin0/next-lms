@@ -9,7 +9,7 @@ import { Plus, FolderOpen, BookOpen, Video, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ModuleAccordion, type Module, type Lesson, type LessonBlock } from './module-accordion'
+import { ModuleAccordion, type Module, type Lesson, type LessonBlock, type VirtualClassroomConfig } from './module-accordion'
 
 type ModulePayload = DbCourseModule & {
   lessons: (DbLesson & { blocks: DbLessonBlock[] })[]
@@ -28,6 +28,7 @@ const mapBlockFromDb = (block: DbLessonBlock): LessonBlock => ({
   contentUrl: block.contentUrl ?? '',
   position: block.position,
   isPublished: block.isPublished,
+  liveSessionConfig: (block.liveSessionConfig as VirtualClassroomConfig | null) ?? null,
 })
 
 const mapLessonFromDb = (lesson: LessonPayload): Lesson => ({
@@ -285,14 +286,19 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
   const handleAddBlock = async (
     moduleId: string,
     lessonId: string,
-    type: 'VIDEO_LESSON' | 'RESOURCES',
+    type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION',
   ) => {
     try {
       const response = await axios.post<DbLessonBlock>(
         `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/blocks`,
         {
           type,
-          title: type === 'VIDEO_LESSON' ? 'New Video Lesson' : 'New Resources',
+          title:
+            type === 'VIDEO_LESSON'
+              ? 'New Video Lesson'
+              : type === 'RESOURCES'
+                ? 'New Resources'
+                : 'Aula virtuale BigBlueButton',
         },
       )
       const block = mapBlockFromDb(response.data)

@@ -50,15 +50,25 @@ export type Lesson = {
   blocks: LessonBlock[]
 }
 
+export type VirtualClassroomConfig = {
+  provider?: string
+  meetingId?: string
+  joinUrl?: string | null
+  dialNumber?: string
+  status?: string
+  scheduledFor?: string
+}
+
 export type LessonBlock = {
   id: string
-  type: 'VIDEO_LESSON' | 'RESOURCES'
+  type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION'
   title: string
   content?: string
   videoUrl?: string
   contentUrl?: string
   position: number
   isPublished: boolean
+  liveSessionConfig?: VirtualClassroomConfig | null
 }
 
 type DbModuleWithRelations = DbCourseModule & {

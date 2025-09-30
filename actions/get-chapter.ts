@@ -1,4 +1,4 @@
-import { CourseEnrollment, UserProgress as PrismaUserProgress } from '@prisma/client'
+import { BlockType, CourseEnrollment, UserProgress as PrismaUserProgress } from '@prisma/client'
 
 import { db } from '@/lib/db'
 
@@ -31,6 +31,20 @@ type ChapterAccessResponse = {
   userProgress: PrismaUserProgress | null
   enrollment: CourseEnrollment | null
   canAccessContent: boolean
+  block:
+    | {
+        id: string
+        type: BlockType
+        liveSessionConfig: Record<string, unknown> | null
+        liveSession:
+          | {
+              id: string
+              scheduledFor: Date
+              durationMinutes: number | null
+            }
+          | null
+      }
+    | null
 }
 
 export async function getChapter({ userProfileId, companyId, courseId, chapterId }: GetChapterArgs): Promise<ChapterAccessResponse> {
@@ -55,6 +69,7 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
         userProgress: null,
         enrollment: null,
         canAccessContent: false,
+        block: null,
       }
     }
 
@@ -80,8 +95,25 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
         userProgress: null,
         enrollment: null,
         canAccessContent: false,
+        block: null,
       }
     }
+
+    const lessonBlock = await db.lessonBlock.findFirst({
+      where: { legacyChapterId: chapter.id },
+      select: {
+        id: true,
+        type: true,
+        liveSessionConfig: true,
+        liveSession: {
+          select: {
+            id: true,
+            scheduledFor: true,
+            durationMinutes: true,
+          },
+        },
+      },
+    })
 
     const enrollment = await db.courseEnrollment.findUnique({
       where: {
@@ -124,6 +156,14 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
       userProgress,
       enrollment,
       canAccessContent,
+      block: lessonBlock
+        ? {
+            id: lessonBlock.id,
+            type: lessonBlock.type,
+            liveSessionConfig: (lessonBlock.liveSessionConfig as Record<string, unknown> | null) ?? null,
+            liveSession: lessonBlock.liveSession,
+          }
+        : null,
     }
   } catch {
     return {
@@ -134,6 +174,7 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
       userProgress: null,
       enrollment: null,
       canAccessContent: false,
+      block: null,
     }
   }
 }

@@ -1,0 +1,2 @@
+-- Placeholder migration recreated to satisfy deployment history.
+-- Original SQL was not available in the repository. No schema changes are applied here.

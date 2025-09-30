@@ -1,12 +1,21 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react'
+import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff, Cast } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { VideoInput } from './video-input'
+
+export type VirtualClassroomConfig = {
+  provider?: string
+  meetingId?: string
+  joinUrl?: string | null
+  dialNumber?: string
+  status?: string
+  scheduledFor?: string
+}
 
 export type Module = {
   id: string
@@ -28,13 +37,14 @@ export type Lesson = {
 
 export type LessonBlock = {
   id: string
-  type: 'VIDEO_LESSON' | 'RESOURCES'
+  type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION'
   title: string
   content?: string
   videoUrl?: string
   contentUrl?: string
   position: number
   isPublished: boolean
+  liveSessionConfig?: VirtualClassroomConfig | null
 }
 
 interface ModuleAccordionProps {
@@ -46,7 +56,7 @@ interface ModuleAccordionProps {
   onUpdateLesson: (moduleId: string, lessonId: string, data: Partial<Lesson>) => void
   onDeleteLesson: (moduleId: string, lessonId: string) => void
   onPersistLesson: (moduleId: string, lessonId: string, overrides?: Partial<Lesson>) => void
-  onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES') => void
+  onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION') => void
   onUpdateBlock: (moduleId: string, lessonId: string, blockId: string, data: Partial<LessonBlock>) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
   onPersistBlock: (moduleId: string, lessonId: string, blockId: string, overrides?: Partial<LessonBlock>) => void
@@ -340,7 +350,7 @@ interface LessonItemProps {
   onBlockUpdate: (lessonId: string, blockId: string, field: keyof LessonBlock, value: string | boolean) => void
   onBlockSave: () => void
   onBlockTogglePublish: (lessonId: string, blockId: string, nextStatus: boolean) => void
-  onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES') => void
+  onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION') => void
   onDeleteLesson: (moduleId: string, lessonId: string) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
   handleKeyDown: (e: React.KeyboardEvent, saveHandler: () => void) => void
@@ -453,6 +463,15 @@ const LessonItem = ({
           <Button
             size="sm"
             variant="ghost"
+            onClick={() => onAddBlock(moduleId, lesson.id, 'LIVE_SESSION')}
+            className="h-6 w-6 p-0"
+            title="Add Virtual Classroom"
+          >
+            <Cast className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={() => onLessonEdit(lesson.id, 'title')}
             className="h-6 w-6 p-0"
           >
@@ -502,7 +521,11 @@ const LessonItem = ({
                 <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-xs">
-                    {block.type === 'VIDEO_LESSON' ? 'Video' : 'Resources'}
+                    {block.type === 'VIDEO_LESSON'
+                      ? 'Video'
+                      : block.type === 'RESOURCES'
+                        ? 'Resources'
+                        : 'Virtual classroom'}
                   </Badge>
 
                     {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'title' ? (
@@ -585,7 +608,7 @@ const LessonItem = ({
                       </p>
                     )}
                   </div>
-                ) : (
+                ) : block.type === 'RESOURCES' ? (
                   <div className="space-y-2">
                     {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'contentUrl' ? (
                       <Input
@@ -622,6 +645,62 @@ const LessonItem = ({
                         onClick={() => onBlockEdit(lesson.id, block.id, 'content')}
                       >
                         {block.content || 'Click to add description...'}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="rounded-md border border-border/40 bg-background/70 p-3 text-xs space-y-1">
+                      <p className="text-xs font-semibold"></p>
+                      <p className="text-xs text-muted-foreground">
+                        Meeting ID: {block.liveSessionConfig?.meetingId ?? 'Da generare'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Stato: {block.liveSessionConfig?.status ?? 'offline'}
+                      </p>
+                      {block.liveSessionConfig?.scheduledFor ? (
+                        <p className="text-xs text-muted-foreground">
+                          Programmata per:{' '}
+                          {new Date(block.liveSessionConfig.scheduledFor).toLocaleString()}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'contentUrl' ? (
+                      <Input
+                        value={block.contentUrl || ''}
+                        onChange={(e) => onBlockUpdate(lesson.id, block.id, 'contentUrl', e.target.value)}
+                        onBlur={onBlockSave}
+                        onKeyDown={(e) => handleKeyDown(e, onBlockSave)}
+                        placeholder="Join URL dell'aula virtuale"
+                        className="text-xs"
+                        autoFocus
+                      />
+                    ) : (
+                      <p
+                        className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                        onClick={() => onBlockEdit(lesson.id, block.id, 'contentUrl')}
+                      >
+                        {block.contentUrl || 'Click per configurare la Join URL...'}
+                      </p>
+                    )}
+
+                    {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'content' ? (
+                      <Textarea
+                        value={block.content || ''}
+                        onChange={(e) => onBlockUpdate(lesson.id, block.id, 'content', e.target.value)}
+                        onBlur={onBlockSave}
+                        onKeyDown={(e) => handleKeyDown(e, onBlockSave)}
+                        placeholder="Note per il facilitatore o i partecipanti..."
+                        className="min-h-[60px] text-xs"
+                        autoFocus
+                      />
+                    ) : (
+                      <p
+                        className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                        onClick={() => onBlockEdit(lesson.id, block.id, 'content')}
+                      >
+                        {block.content || 'Click per aggiungere note sull\'aula virtuale...'}
                       </p>
                     )}
                   </div>

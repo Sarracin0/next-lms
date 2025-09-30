@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { BlockType, UserRole } from '@prisma/client'
+import { BlockType, Prisma, UserRole } from '@prisma/client'
 
 import { db } from '@/lib/db'
 import { assertRole, requireAuthContext } from '@/lib/current-profile'
@@ -74,8 +74,22 @@ export async function PATCH(request: NextRequest, { params }: { params: RoutePar
       data.position = body.position
     }
 
-    if (typeof body.type === 'string' && Object.values(BlockType).includes(body.type as BlockType)) {
-      data.type = body.type as BlockType
+    if (blockRecord.type === BlockType.LIVE_SESSION) {
+      const shouldUpdateJoinUrl = Object.prototype.hasOwnProperty.call(data, 'contentUrl')
+      const shouldUpdateDescription = Object.prototype.hasOwnProperty.call(data, 'content')
+
+      if (shouldUpdateJoinUrl || shouldUpdateDescription) {
+        const currentConfig = (blockRecord.liveSessionConfig as Prisma.JsonObject | null) ?? {}
+        const updatedConfig: Prisma.JsonObject = {
+          ...currentConfig,
+        }
+
+        if (shouldUpdateJoinUrl) {
+          updatedConfig.joinUrl = data.contentUrl ?? null
+        }
+
+        data.liveSessionConfig = updatedConfig
+      }
     }
 
     if (Object.keys(data).length === 0) {
@@ -88,6 +102,23 @@ export async function PATCH(request: NextRequest, { params }: { params: RoutePar
     })
 
     await syncLegacyChapterForBlock(blockId)
+
+    if (block.liveSessionId) {
+      const liveSessionUpdates: Record<string, unknown> = {}
+      if (Object.prototype.hasOwnProperty.call(data, 'title')) {
+        liveSessionUpdates.title = block.title
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'content')) {
+        liveSessionUpdates.description = block.content ?? null
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'contentUrl')) {
+        liveSessionUpdates.meetingUrl = block.contentUrl ?? null
+      }
+
+      if (Object.keys(liveSessionUpdates).length > 0) {
+        await db.liveSession.update({ where: { id: block.liveSessionId }, data: liveSessionUpdates })
+      }
+    }
 
     return NextResponse.json(block)
   } catch (error) {
@@ -124,6 +155,10 @@ export async function DELETE(request: NextRequest, { params }: { params: RoutePa
 
     if (blockRecord.legacyChapterId) {
       await db.chapter.delete({ where: { id: blockRecord.legacyChapterId } }).catch(() => undefined)
+    }
+
+    if (blockRecord.liveSessionId) {
+      await db.liveSession.delete({ where: { id: blockRecord.liveSessionId } }).catch(() => undefined)
     }
 
     return new NextResponse(null, { status: 204 })

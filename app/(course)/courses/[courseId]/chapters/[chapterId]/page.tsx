@@ -11,6 +11,7 @@ import { requireAuthContext } from '@/lib/current-profile'
 import CourseEnrollButton from './_components/course-enroll-button'
 import { CourseProgressButton } from './_components/course-progress-button'
 import { VideoPlayer } from './_components/video-player'
+import { VirtualClassroomCard } from './_components/virtual-classroom-card'
 
 type ChapterDetailsProps = {
   params: Promise<{
@@ -23,7 +24,16 @@ export default async function ChapterDetails({ params }: ChapterDetailsProps) {
   const resolvedParams = await params
   const { profile, company } = await requireAuthContext()
 
-  const { course, chapter, attachments, nextChapter, userProgress, enrollment, canAccessContent } = await getChapter({
+  const {
+    course,
+    chapter,
+    attachments,
+    nextChapter,
+    userProgress,
+    enrollment,
+    canAccessContent,
+    block,
+  } = await getChapter({
     userProfileId: profile.id,
     companyId: company.id,
     ...resolvedParams,
@@ -35,6 +45,18 @@ export default async function ChapterDetails({ params }: ChapterDetailsProps) {
 
   const isLocked = !canAccessContent
   const completedOnEnd = Boolean(enrollment) && !userProgress?.isCompleted
+  const liveSessionConfig = block?.liveSessionConfig ?? null
+  const liveSessionJoinUrl =
+    liveSessionConfig && typeof liveSessionConfig.joinUrl === 'string'
+      ? liveSessionConfig.joinUrl
+      : null
+  const liveSessionMeetingId =
+    liveSessionConfig && typeof liveSessionConfig.meetingId === 'string'
+      ? liveSessionConfig.meetingId
+      : undefined
+  const liveSessionStatus =
+    liveSessionConfig && typeof liveSessionConfig.status === 'string' ? liveSessionConfig.status : undefined
+  const liveSessionScheduledFor = block?.liveSession?.scheduledFor?.toISOString() ?? null
 
   return (
     <div>
@@ -43,15 +65,26 @@ export default async function ChapterDetails({ params }: ChapterDetailsProps) {
 
       <div className="mx-auto flex max-w-4xl flex-col pb-20">
         <div className="p-4">
-          <VideoPlayer
-            chapterId={chapter.id}
-            title={chapter.title}
-            courseId={resolvedParams.courseId}
-            nextChapterId={nextChapter?.id}
-            isLocked={isLocked}
-            completeOnEnd={completedOnEnd}
-            videoUrl={chapter.videoUrl ?? undefined}
-          />
+          {block?.type === 'LIVE_SESSION' ? (
+            <VirtualClassroomCard
+              title={chapter.title}
+              meetingId={liveSessionMeetingId}
+              joinUrl={liveSessionJoinUrl ?? chapter.contentUrl}
+              status={liveSessionStatus}
+              scheduledFor={liveSessionScheduledFor}
+              isLocked={isLocked}
+            />
+          ) : (
+            <VideoPlayer
+              chapterId={chapter.id}
+              title={chapter.title}
+              courseId={resolvedParams.courseId}
+              nextChapterId={nextChapter?.id}
+              isLocked={isLocked}
+              completeOnEnd={completedOnEnd}
+              videoUrl={chapter.videoUrl ?? undefined}
+            />
+          )}
         </div>
 
         <div>

@@ -66,6 +66,7 @@ enum QuestAssigneeType {
 enum BlockType {
   VIDEO_LESSON
   RESOURCES
+  LIVE_SESSION
 }
 
 enum CourseEnrollmentStatus {
@@ -441,6 +442,7 @@ model LiveSession {
   company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   course  Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
   host    UserProfile @relation("LiveSessionHost", fields: [hostId], references: [id])
+  blocks  LessonBlock[]
 }
 
 // New hierarchical course structure: Course → Module → Lesson → Block
@@ -496,6 +498,9 @@ model LessonBlock {
   attachments LessonBlockAttachment[]
   legacyChapterId String?  @unique
   legacyChapter   Chapter? @relation("LessonBlockChapter", fields: [legacyChapterId], references: [id], onDelete: SetNull)
+  liveSessionId      String?
+  liveSession        LiveSession? @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
+  liveSessionConfig  Json?
 
   @@index([lessonId])
 }
