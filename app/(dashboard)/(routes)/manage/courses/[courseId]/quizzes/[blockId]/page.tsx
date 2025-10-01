@@ -12,24 +12,26 @@ export default async function ManageQuizPage({ params }: { params: Promise<{ cou
 
   const block = await db.lessonBlock.findFirst({
     where: { id: blockId, lesson: { module: { courseId, course: { companyId: company.id } } } },
-    include: {
-      quiz: {
-        include: {
-          questions: {
-            include: { options: true, answers: false },
-            orderBy: { position: 'asc' },
-          },
-        },
-      },
-      lesson: { include: { module: { include: { course: true } } } },
-    },
+    include: { lesson: { include: { module: { include: { course: true } } } } },
   })
 
-  if (!block || !block.quiz) {
+  if (!block) {
     notFound()
   }
 
-  const quiz = block.quiz
+  const quiz = await db.quiz.findFirst({
+    where: { lessonBlockId: blockId, companyId: company.id },
+    include: {
+      questions: {
+        include: { options: true },
+        orderBy: { position: 'asc' },
+      },
+    },
+  })
+
+  if (!quiz) {
+    notFound()
+  }
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
