@@ -60,6 +60,25 @@ const CourseIdPage = async ({ params }: CourseIdPageProps) => {
             orderBy: { position: 'asc' },
             include: {
               attachments: { orderBy: { createdAt: 'asc' } },
+              quiz: {
+                include: {
+                  questions: { include: { options: true }, orderBy: { position: 'asc' } },
+                },
+              },
+              gamification: {
+                include: {
+                  quiz: {
+                    include: {
+                      questions: { include: { options: true }, orderBy: { position: 'asc' } },
+                    },
+                  },
+                  flashcardDeck: {
+                    include: {
+                      cards: { orderBy: { position: 'asc' } },
+                    },
+                  },
+                },
+              },
             },
           },
         },

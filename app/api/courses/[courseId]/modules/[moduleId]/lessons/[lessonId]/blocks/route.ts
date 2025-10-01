@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { BlockType, Prisma, UserRole } from '@prisma/client'
+import { BlockType, GamificationContentType, Prisma, UserRole } from '@prisma/client'
 
 import { db } from '@/lib/db'
 import { assertRole, requireAuthContext } from '@/lib/current-profile'
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
     const body = await request.json()
 
     // Robust validation: allow QUIZ even if local enum is stale
-    const allowedTypes = ['VIDEO_LESSON', 'RESOURCES', 'LIVE_SESSION', 'QUIZ'] as const
+    const allowedTypes = ['VIDEO_LESSON', 'RESOURCES', 'LIVE_SESSION', 'QUIZ', 'GAMIFICATION'] as const
     type AllowedType = typeof allowedTypes[number]
     const typeValue = typeof body.type === 'string' ? (body.type as string) : ''
     const isAllowed = allowedTypes.includes(typeValue as AllowedType)
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
       RESOURCES: 'New Resources',
       LIVE_SESSION: 'Aula virtuale BigBlueButton',
       QUIZ: 'New Quiz',
+      GAMIFICATION: 'New Gamification',
     }
 
     const titleRaw = typeof body.title === 'string' ? body.title : ''
@@ -143,9 +144,58 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
       })
     }
 
+    if (type === 'GAMIFICATION') {
+      const rawContentType = typeof body.contentType === 'string' ? body.contentType.toUpperCase() : ''
+      const contentType = Object.values(GamificationContentType).includes(rawContentType as GamificationContentType)
+        ? (rawContentType as GamificationContentType)
+        : GamificationContentType.QUIZ
+
+      const sourceAttachmentIds = Array.isArray(body.sourceAttachmentIds)
+        ? body.sourceAttachmentIds.filter((value: unknown): value is string => typeof value === 'string')
+        : []
+
+      const config = typeof body.config === 'object' && body.config !== null ? (body.config as Prisma.JsonObject) : null
+
+      await db.gamificationBlock.create({
+        data: {
+          lessonBlockId: block.id,
+          requestedById: profile.id,
+          contentType,
+          sourceAttachmentIds,
+          config,
+        },
+      })
+    }
+
     await syncLegacyChapterForBlock(block.id)
 
-    return NextResponse.json(block, { status: 201 })
+    const hydratedBlock = await db.lessonBlock.findUnique({
+      where: { id: block.id },
+      include: {
+        attachments: { orderBy: { createdAt: 'asc' } },
+        quiz: {
+          include: {
+            questions: { include: { options: true }, orderBy: { position: 'asc' } },
+          },
+        },
+        gamification: {
+          include: {
+            quiz: {
+              include: {
+                questions: { include: { options: true }, orderBy: { position: 'asc' } },
+              },
+            },
+            flashcardDeck: {
+              include: {
+                cards: { orderBy: { position: 'asc' } },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(hydratedBlock ?? block, { status: 201 })
   } catch (error) {
     logError('COURSE_BLOCK_POST', error)
     return new NextResponse('Internal server error', { status: 500 })

@@ -3,7 +3,21 @@
 import { useState, useRef, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { useParams } from 'next/navigation'
-import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff, Cast, ListChecks, Video, FileText, Loader2 } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  Edit3,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Cast,
+  ListChecks,
+  Video,
+  FileText,
+  Loader2,
+  Sparkles,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,6 +26,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { VideoInput } from './video-input'
 import { UploadDropzone } from '@/lib/uploadthing'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { GamificationStudio } from './gamification-studio'
 
 export type VirtualClassroomConfig = {
   provider?: string
@@ -42,7 +57,7 @@ export type Lesson = {
 
 export type LessonBlock = {
   id: string
-  type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ'
+  type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ' | 'GAMIFICATION'
   title: string
   content?: string
   videoUrl?: string
@@ -51,9 +66,43 @@ export type LessonBlock = {
   isPublished: boolean
   liveSessionConfig?: VirtualClassroomConfig | null
   attachments?: { id: string; name: string; url: string; type: string | null }[]
+  quizSummary?: {
+    id: string
+    title: string
+    questionCount: number
+    pointsReward: number
+  } | null
+  gamification?: {
+    id: string
+    status: import('@prisma/client').GamificationStatus
+    contentType: import('@prisma/client').GamificationContentType
+    quizId: string | null
+    sourceAttachmentIds: string[]
+    config: Record<string, unknown> | null
+    flashcardDeck: {
+      id: string
+      title: string
+      description?: string | null
+      cardCount: number
+      cards: { id: string; front: string; back: string; points: number; position: number }[]
+    } | null
+    quizSummary: {
+      id: string
+      title: string
+      questionCount: number
+      pointsReward: number
+    } | null
+  } | null
 }
 
 type ResourceInputMode = 'upload' | 'link'
+
+const gamificationStatusStyles: Record<string, string> = {
+  DRAFT: 'bg-slate-100 text-slate-700',
+  GENERATING: 'bg-amber-100 text-amber-700',
+  READY: 'bg-emerald-100 text-emerald-700',
+  FAILED: 'bg-rose-100 text-rose-700',
+}
 
 interface ModuleAccordionProps {
   module: Module
@@ -64,10 +113,15 @@ interface ModuleAccordionProps {
   onUpdateLesson: (moduleId: string, lessonId: string, data: Partial<Lesson>) => void
   onDeleteLesson: (moduleId: string, lessonId: string) => void
   onPersistLesson: (moduleId: string, lessonId: string, overrides?: Partial<Lesson>) => void
-  onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ') => void
+  onAddBlock: (
+    moduleId: string,
+    lessonId: string,
+    type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ' | 'GAMIFICATION',
+  ) => void
   onUpdateBlock: (moduleId: string, lessonId: string, blockId: string, data: Partial<LessonBlock>) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
   onPersistBlock: (moduleId: string, lessonId: string, blockId: string, overrides?: Partial<LessonBlock>) => void
+  onReplaceBlock: (moduleId: string, lessonId: string, blockId: string, block: LessonBlock) => void
   onCreateAttachment: (
     moduleId: string,
     lessonId: string,
@@ -90,6 +144,7 @@ export const ModuleAccordion = ({
   onUpdateBlock,
   onDeleteBlock,
   onPersistBlock,
+  onReplaceBlock,
   onCreateAttachment,
   onDeleteAttachment,
 }: ModuleAccordionProps) => {
@@ -422,7 +477,12 @@ interface LessonItemProps {
   onBlockUpdate: (lessonId: string, blockId: string, field: keyof LessonBlock, value: string | boolean) => void
   onBlockSave: () => void
   onBlockTogglePublish: (lessonId: string, blockId: string, nextStatus: boolean) => void
-  onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ') => void
+  onAddBlock: (
+    moduleId: string,
+    lessonId: string,
+    type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ' | 'GAMIFICATION',
+  ) => void
+  onReplaceBlock: (moduleId: string, lessonId: string, blockId: string, block: LessonBlock) => void
   onDeleteLesson: (moduleId: string, lessonId: string) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
   handleBlockAttachmentUpload: (
@@ -452,6 +512,7 @@ const LessonItem = (props: LessonItemProps) => {
     onBlockSave,
     onBlockTogglePublish,
     onAddBlock,
+    onReplaceBlock,
     onDeleteLesson,
     onDeleteBlock,
     handleBlockAttachmentUpload,
@@ -558,6 +619,10 @@ const LessonItem = (props: LessonItemProps) => {
                 <ListChecks className="mr-2 h-3.5 w-3.5 text-[#5D62E1]" />
                 <span>Quiz</span>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAddBlock(moduleId, lesson.id, 'GAMIFICATION')}>
+                <Sparkles className="mr-2 h-3.5 w-3.5 text-[#5D62E1]" />
+                <span>Gamification</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
@@ -608,8 +673,26 @@ const LessonItem = (props: LessonItemProps) => {
           {/* Blocks */}
           <div className="space-y-2">
             {lesson.blocks.map((block) => {
-              const BlockIcon = block.type === 'VIDEO_LESSON' ? Video : block.type === 'RESOURCES' ? FileText : block.type === 'QUIZ' ? ListChecks : Cast
-              const blockLabel = block.type === 'VIDEO_LESSON' ? 'Video' : block.type === 'RESOURCES' ? 'Resources' : block.type === 'QUIZ' ? 'Quiz' : 'Virtual classroom'
+              const BlockIcon =
+                block.type === 'VIDEO_LESSON'
+                  ? Video
+                  : block.type === 'RESOURCES'
+                    ? FileText
+                    : block.type === 'QUIZ'
+                      ? ListChecks
+                      : block.type === 'GAMIFICATION'
+                        ? Sparkles
+                        : Cast
+              const blockLabel =
+                block.type === 'VIDEO_LESSON'
+                  ? 'Video'
+                  : block.type === 'RESOURCES'
+                    ? 'Resources'
+                    : block.type === 'QUIZ'
+                      ? 'Quiz'
+                      : block.type === 'GAMIFICATION'
+                        ? 'Gamification'
+                        : 'Virtual classroom'
               const attachments = block.attachments ?? []
               const resourceMode = resourceModeByBlock[block.id] ?? (attachments.length > 0 ? 'upload' : block.contentUrl ? 'link' : 'upload')
               return (
@@ -643,6 +726,14 @@ const LessonItem = (props: LessonItemProps) => {
                     <Badge variant={block.isPublished ? 'default' : 'secondary'} className="text-xs">
                       {block.isPublished ? 'Published' : 'Draft'}
                     </Badge>
+                    {block.type === 'GAMIFICATION' && block.gamification ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs capitalize ${gamificationStatusStyles[block.gamification.status] ?? 'bg-slate-100 text-slate-700'}`}
+                      >
+                        {block.gamification.status.toLowerCase()}
+                      </Badge>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -854,11 +945,21 @@ const LessonItem = (props: LessonItemProps) => {
                         {block.content || 'Click to add notes/instructions...'}
                       </p>
                     )}
-
-<a href={(courseId ? '/manage/courses/' + courseId + '/quizzes/' + block.id : 'quizzes/' + block.id)} className="inline-flex items-center text-xs text-primary hover:underline">
+                    <a
+                      href={courseId ? `/manage/courses/${courseId}/quizzes/${block.id}` : `/manage/courses/quizzes/${block.id}`}
+                      className="inline-flex items-center text-xs text-primary hover:underline"
+                    >
                       Apri editor quiz
                     </a>
                   </div>
+                ) : block.type === 'GAMIFICATION' ? (
+                  <GamificationStudio
+                    courseId={courseId ?? ''}
+                    moduleId={moduleId}
+                    lessonId={lesson.id}
+                    block={block}
+                    onReplaceBlock={onReplaceBlock}
+                  />
                 ) : (
                   <div className="space-y-2">
                     <div className="rounded-md border border-border/40 bg-background/70 p-3 text-xs space-y-1">

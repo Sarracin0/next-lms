@@ -69,7 +69,7 @@ export type VirtualClassroomConfig = {
 
 export type LessonBlock = {
   id: string
-  type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ'
+  type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ' | 'GAMIFICATION'
   title: string
   content?: string
   videoUrl?: string
@@ -78,6 +78,33 @@ export type LessonBlock = {
   isPublished: boolean
   liveSessionConfig?: VirtualClassroomConfig | null
   attachments?: LessonAttachment[]
+  quizSummary?: {
+    id: string
+    title: string
+    questionCount: number
+    pointsReward: number
+  } | null
+  gamification?: {
+    id: string
+    status: import('@prisma/client').GamificationStatus
+    contentType: import('@prisma/client').GamificationContentType
+    quizId: string | null
+    sourceAttachmentIds: string[]
+    config: Record<string, unknown> | null
+    flashcardDeck: {
+      id: string
+      title: string
+      description?: string | null
+      cardCount: number
+      cards: { id: string; front: string; back: string; points: number; position: number }[]
+    } | null
+    quizSummary: {
+      id: string
+      title: string
+      questionCount: number
+      pointsReward: number
+    } | null
+  } | null
 }
 
 type DbAchievementWithRelations = DbCourseAchievement & {

@@ -7,73 +7,75 @@ import { logError } from '@/lib/logger'
 
 type RouteParams = Promise<{
   courseId: string
-  chapterId: string
 }>
 
-export async function GET(request: NextRequest, { params }: { params: RouteParams }) {
+export async function GET(_: NextRequest, { params }: { params: RouteParams }) {
   try {
-    const { courseId, chapterId } = await params
     const { profile, company } = await requireAuthContext()
     assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    const chapter = await db.chapter.findFirst({
-      where: { id: chapterId, courseId, course: { companyId: company.id } },
-    })
-
-    if (!chapter) {
-      return new NextResponse('Chapter not found', { status: 404 })
-    }
+    const { courseId } = await params
 
     const attachments = await db.attachment.findMany({
-      where: { courseId, chapterId, scope: AttachmentScope.LESSON },
+      where: {
+        courseId,
+        course: { companyId: company.id },
+        scope: { in: [AttachmentScope.COURSE, AttachmentScope.LESSON] },
+      },
+      include: {
+        chapter: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     })
 
     return NextResponse.json(attachments)
   } catch (error) {
-    logError('CHAPTER_ATTACHMENTS_GET', error)
+    logError('COURSE_DOCUMENTS_GET', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest, { params }: { params: RouteParams }) {
   try {
-    const { courseId, chapterId } = await params
     const { profile, company } = await requireAuthContext()
     assertRole(profile, [UserRole.HR_ADMIN, UserRole.TRAINER])
 
-    const chapter = await db.chapter.findFirst({
-      where: { id: chapterId, courseId, course: { companyId: company.id } },
+    const { courseId } = await params
+
+    const course = await db.course.findFirst({
+      where: { id: courseId, companyId: company.id },
+      select: { id: true },
     })
 
-    if (!chapter) {
-      return new NextResponse('Chapter not found', { status: 404 })
-    }
-
-    if (profile.role === UserRole.TRAINER && chapter.courseId !== courseId) {
-      return new NextResponse('Forbidden', { status: 403 })
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 })
     }
 
     const { url, name, type } = await request.json()
 
-    if (!url) {
-      return new NextResponse('Attachment url is required', { status: 400 })
+    if (typeof url !== 'string' || !url.trim()) {
+      return new NextResponse('Document url is required', { status: 400 })
     }
 
     const attachment = await db.attachment.create({
       data: {
         courseId,
-        chapterId,
-        url,
-        name: name ?? url.split('/').pop() ?? 'Resource',
-        type: type ?? null,
-        scope: AttachmentScope.LESSON,
+        chapterId: null,
+        url: url.trim(),
+        name: typeof name === 'string' && name.trim() ? name.trim() : url.trim().split('/').pop() ?? 'Document',
+        type: typeof type === 'string' && type.trim() ? type.trim() : null,
+        scope: AttachmentScope.COURSE,
       },
     })
 
     return NextResponse.json(attachment, { status: 201 })
   } catch (error) {
-    logError('CHAPTER_ATTACHMENTS_POST', error)
+    logError('COURSE_DOCUMENTS_POST', error)
     return new NextResponse('Internal server error', { status: 500 })
   }
 }

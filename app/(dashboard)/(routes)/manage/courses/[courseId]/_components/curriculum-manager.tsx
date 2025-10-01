@@ -8,15 +8,39 @@ import type {
   Lesson as DbLesson,
   LessonBlock as DbLessonBlock,
   LessonBlockAttachment as DbLessonBlockAttachment,
+  FlashcardCard as DbFlashcardCard,
+  FlashcardDeck as DbFlashcardDeck,
+  GamificationBlock as DbGamificationBlock,
+  GamificationContentType,
+  GamificationStatus,
+  Quiz as DbQuiz,
+  QuizOption as DbQuizOption,
+  QuizQuestion as DbQuizQuestion,
 } from '@prisma/client'
 import { Plus, FolderOpen, BookOpen, Video, FileText } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ModuleAccordion, type Module, type Lesson, type LessonBlock, type VirtualClassroomConfig } from './module-accordion'
+import {
+  ModuleAccordion,
+  type Module,
+  type Lesson,
+  type LessonBlock,
+  type VirtualClassroomConfig,
+} from './module-accordion'
 
-type BlockPayload = DbLessonBlock & { attachments?: DbLessonBlockAttachment[] }
+type QuizPayload = DbQuiz & { questions: (DbQuizQuestion & { options: DbQuizOption[] })[] }
+type GamificationPayload = DbGamificationBlock & {
+  flashcardDeck?: (DbFlashcardDeck & { cards: DbFlashcardCard[] }) | null
+  quiz?: QuizPayload | null
+}
+
+type BlockPayload = DbLessonBlock & {
+  attachments?: DbLessonBlockAttachment[]
+  quiz?: QuizPayload | null
+  gamification?: GamificationPayload | null
+}
 
 type LessonPayload = DbLesson & { blocks: BlockPayload[] }
 
@@ -33,6 +57,34 @@ const mapAttachmentFromDb = (attachment: DbLessonBlockAttachment) => ({
   type: attachment.type ?? null,
 })
 
+const mapQuizSummary = (quiz?: QuizPayload | null) => {
+  if (!quiz) return null
+  return {
+    id: quiz.id,
+    title: quiz.title,
+    questionCount: quiz.questions.length,
+    pointsReward: quiz.pointsReward,
+  }
+}
+
+const mapFlashcardDeck = (deck?: (DbFlashcardDeck & { cards: DbFlashcardCard[] }) | null) => {
+  if (!deck) return null
+  const orderedCards = [...deck.cards].sort((a, b) => a.position - b.position)
+  return {
+    id: deck.id,
+    title: deck.title,
+    description: deck.description ?? null,
+    cardCount: orderedCards.length,
+    cards: orderedCards.map((card) => ({
+      id: card.id,
+      front: card.front,
+      back: card.back,
+      points: card.points,
+      position: card.position,
+    })),
+  }
+}
+
 const mapBlockFromDb = (block: BlockPayload): LessonBlock => ({
   id: block.id,
   type: block.type,
@@ -44,6 +96,19 @@ const mapBlockFromDb = (block: BlockPayload): LessonBlock => ({
   isPublished: block.isPublished,
   liveSessionConfig: (block.liveSessionConfig as VirtualClassroomConfig | null) ?? null,
   attachments: block.attachments?.map(mapAttachmentFromDb) ?? [],
+  quizSummary: mapQuizSummary(block.quiz ?? block.gamification?.quiz ?? null),
+  gamification: block.gamification
+    ? {
+        id: block.gamification.id,
+        status: block.gamification.status,
+        contentType: block.gamification.contentType,
+        quizId: block.gamification.quiz?.id ?? block.quiz?.id ?? null,
+        sourceAttachmentIds: block.gamification.sourceAttachmentIds,
+        config: (block.gamification.config as Record<string, unknown> | null) ?? null,
+        flashcardDeck: mapFlashcardDeck(block.gamification.flashcardDeck ?? null),
+        quizSummary: mapQuizSummary(block.gamification.quiz ?? block.quiz ?? null),
+      }
+    : null,
 })
 
 const mapLessonFromDb = (lesson: LessonPayload): Lesson => ({
@@ -155,6 +220,31 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
     )
   }
 
+  const replaceBlockState = (
+    moduleId: string,
+    lessonId: string,
+    blockId: string,
+    nextBlock: LessonBlock,
+  ) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id !== moduleId
+          ? module
+          : {
+              ...module,
+              lessons: module.lessons.map((lesson) =>
+                lesson.id !== lessonId
+                  ? lesson
+                  : {
+                      ...lesson,
+                      blocks: lesson.blocks.map((block) => (block.id === blockId ? nextBlock : block)),
+                    },
+              ),
+            },
+      ),
+    )
+  }
+
   const appendBlockAttachmentState = (
     moduleId: string,
     lessonId: string,
@@ -185,6 +275,10 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
             },
       ),
     )
+  }
+
+  const handleReplaceBlock = (moduleId: string, lessonId: string, blockId: string, nextBlock: LessonBlock) => {
+    replaceBlockState(moduleId, lessonId, blockId, nextBlock)
   }
 
   const removeBlockAttachmentState = (
@@ -365,7 +459,7 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
   const handleAddBlock = async (
     moduleId: string,
     lessonId: string,
-    type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ',
+    type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ' | 'GAMIFICATION',
   ) => {
     try {
       const response = await axios.post<DbLessonBlock>(
@@ -379,7 +473,9 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
                 ? 'New Resources'
                 : type === 'QUIZ'
                   ? 'New Quiz'
-                  : 'Aula virtuale BigBlueButton',
+                  : type === 'GAMIFICATION'
+                    ? 'New Gamification'
+                    : 'Aula virtuale BigBlueButton',
         },
       )
       const block = mapBlockFromDb(response.data)
@@ -602,6 +698,7 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
               onUpdateBlock={handleUpdateBlock}
               onDeleteBlock={handleDeleteBlock}
               onPersistBlock={handlePersistBlock}
+              onReplaceBlock={handleReplaceBlock}
               onCreateAttachment={handleCreateBlockAttachment}
               onDeleteAttachment={handleDeleteBlockAttachment}
             />
