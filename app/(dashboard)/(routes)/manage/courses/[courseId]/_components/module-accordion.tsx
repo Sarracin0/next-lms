@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import toast from 'react-hot-toast'
 import { useParams } from 'next/navigation'
-import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff, Cast, ListChecks, Video, FileText } from 'lucide-react'
+import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff, Cast, ListChecks, Video, FileText, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { VideoInput } from './video-input'
+import { UploadDropzone } from '@/lib/uploadthing'
 
 export type VirtualClassroomConfig = {
   provider?: string
@@ -47,6 +49,7 @@ export type LessonBlock = {
   position: number
   isPublished: boolean
   liveSessionConfig?: VirtualClassroomConfig | null
+  attachments?: { id: string; name: string; url: string; type: string | null }[]
 }
 
 interface ModuleAccordionProps {
@@ -62,6 +65,13 @@ interface ModuleAccordionProps {
   onUpdateBlock: (moduleId: string, lessonId: string, blockId: string, data: Partial<LessonBlock>) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
   onPersistBlock: (moduleId: string, lessonId: string, blockId: string, overrides?: Partial<LessonBlock>) => void
+  onCreateAttachment: (
+    moduleId: string,
+    lessonId: string,
+    blockId: string,
+    payload: { url: string; name?: string | null; type?: string | null },
+  ) => Promise<void>
+  onDeleteAttachment: (moduleId: string, lessonId: string, blockId: string, attachmentId: string) => Promise<void>
 }
 
 export const ModuleAccordion = ({
@@ -77,6 +87,8 @@ export const ModuleAccordion = ({
   onUpdateBlock,
   onDeleteBlock,
   onPersistBlock,
+  onCreateAttachment,
+  onDeleteAttachment,
 }: ModuleAccordionProps) => {
   const params = useParams() as { courseId?: string }
   const courseId = params?.courseId ?? ''
@@ -88,6 +100,9 @@ export const ModuleAccordion = ({
     id: string
     field: 'title' | 'content' | 'videoUrl' | 'contentUrl'
   } | null>(null)
+
+  const [pendingAttachmentBlockId, setPendingAttachmentBlockId] = useState<string | null>(null)
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null)
 
   // Stati degli accordion - sempre aperti di default per evitare problemi
   const [moduleOpen, setModuleOpen] = useState(true)
@@ -197,6 +212,49 @@ export const ModuleAccordion = ({
       onPersistBlock(module.id, lessonId, blockId, { isPublished: nextStatus })
     },
     [module.id, onPersistBlock, onUpdateBlock],
+  )
+
+  const handleBlockAttachmentUpload = useCallback(
+    async (
+      lessonId: string,
+      blockId: string,
+      file?: { url?: string | null; ufsUrl?: string | null; appUrl?: string | null; name?: string | null; type?: string | null },
+    ) => {
+      if (!file) return
+      const url = (file.ufsUrl ?? file.url ?? file.appUrl)?.toString()
+      if (!url) {
+        toast.error('Upload failed, missing file URL')
+        return
+      }
+
+      setPendingAttachmentBlockId(blockId)
+      try {
+        await onCreateAttachment(module.id, lessonId, blockId, {
+          url,
+          name: file.name ?? null,
+          type: file.type ?? null,
+        })
+      } catch {
+        // Error feedback handled upstream
+      } finally {
+        setPendingAttachmentBlockId((current) => (current === blockId ? null : current))
+      }
+    },
+    [module.id, onCreateAttachment],
+  )
+
+  const handleBlockAttachmentDelete = useCallback(
+    async (lessonId: string, blockId: string, attachmentId: string) => {
+      setDeletingAttachmentId(attachmentId)
+      try {
+        await onDeleteAttachment(module.id, lessonId, blockId, attachmentId)
+      } catch {
+        // Error feedback handled upstream
+      } finally {
+        setDeletingAttachmentId((current) => (current === attachmentId ? null : current))
+      }
+    },
+    [module.id, onDeleteAttachment],
   )
 
   // Gestione keyboard events
@@ -530,6 +588,7 @@ const LessonItem = ({
             {lesson.blocks.map((block) => {
               const BlockIcon = block.type === 'VIDEO_LESSON' ? Video : block.type === 'RESOURCES' ? FileText : block.type === 'QUIZ' ? ListChecks : Cast
               const blockLabel = block.type === 'VIDEO_LESSON' ? 'Video' : block.type === 'RESOURCES' ? 'Resources' : block.type === 'QUIZ' ? 'Quiz' : 'Virtual classroom'
+              const attachments = block.attachments ?? []
               return (
               <div key={block.id} className="group relative rounded-xl border border-border/50 bg-card/60 p-3 transition hover:bg-muted/30">
                 <div className="pointer-events-none absolute left-0 top-0 h-full w-[3px] rounded-l-md bg-[#5D62E1] opacity-70" />
@@ -621,45 +680,111 @@ const LessonItem = ({
                     )}
                   </div>
                 ) : block.type === 'RESOURCES' ? (
-                  <div className="space-y-2">
-                    {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'contentUrl' ? (
-                      <Input
-                        value={block.contentUrl || ''}
-                        onChange={(e) => onBlockUpdate(lesson.id, block.id, 'contentUrl', e.target.value)}
-                        onBlur={onBlockSave}
-                        onKeyDown={(e) => handleKeyDown(e, onBlockSave)}
-                        placeholder="Resource URL"
-                        className="text-xs"
-                        autoFocus
-                      />
-                    ) : (
-                      <p
-                        className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => onBlockEdit(lesson.id, block.id, 'contentUrl')}
-                      >
-                        {block.contentUrl || 'Click to add resource URL...'}
-                      </p>
-                    )}
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'contentUrl' ? (
+                        <Input
+                          value={block.contentUrl || ''}
+                          onChange={(e) => onBlockUpdate(lesson.id, block.id, 'contentUrl', e.target.value)}
+                          onBlur={onBlockSave}
+                          onKeyDown={(e) => handleKeyDown(e, onBlockSave)}
+                          placeholder="Resource URL"
+                          className="text-xs"
+                          autoFocus
+                        />
+                      ) : (
+                        <p
+                          className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                          onClick={() => onBlockEdit(lesson.id, block.id, 'contentUrl')}
+                        >
+                          {block.contentUrl || 'Click to add resource URL...'}
+                        </p>
+                      )}
 
-                    {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'content' ? (
-                      <Textarea
-                        value={block.content || ''}
-                        onChange={(e) => onBlockUpdate(lesson.id, block.id, 'content', e.target.value)}
-                        onBlur={onBlockSave}
-                        onKeyDown={(e) => handleKeyDown(e, onBlockSave)}
-                        placeholder="Resource description..."
-                        className="min-h-[60px] text-xs"
-                        autoFocus
-                      />
-                    ) : (
-                      <p
-                        className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => onBlockEdit(lesson.id, block.id, 'content')}
-                      >
-                        {block.content || 'Click to add description...'}
-                      </p>
-                    )}
+                      {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'content' ? (
+                        <Textarea
+                          value={block.content || ''}
+                          onChange={(e) => onBlockUpdate(lesson.id, block.id, 'content', e.target.value)}
+                          onBlur={onBlockSave}
+                          onKeyDown={(e) => handleKeyDown(e, onBlockSave)}
+                          placeholder="Resource description..."
+                          className="min-h-[60px] text-xs"
+                          autoFocus
+                        />
+                      ) : (
+                        <p
+                          className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                          onClick={() => onBlockEdit(lesson.id, block.id, 'content')}
+                        >
+                          {block.content || 'Click to add description...'}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="rounded-md border border-dashed border-border/60 bg-muted/20 p-3">
+                      <p className="text-xs font-semibold text-foreground">Upload documents</p>
+                      <p className="text-xs text-muted-foreground">Carica PDF, slide o dispense da allegare alla lezione.</p>
+                      <div className="mt-2">
+                        <UploadDropzone
+                          endpoint="courseAttachment"
+                          onClientUploadComplete={async (res) => {
+                            const file = res?.[0] as {
+                              url?: string | null
+                              ufsUrl?: string | null
+                              appUrl?: string | null
+                              name?: string | null
+                              type?: string | null
+                            } | undefined
+                            if (!file) return
+                            await handleBlockAttachmentUpload(lesson.id, block.id, file)
+                          }}
+                          onUploadError={(error) => toast.error(error.message)}
+                        />
+                      </div>
+                      {pendingAttachmentBlockId === block.id ? (
+                        <p className="mt-2 text-xs text-muted-foreground">Saving attachment…</p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-1">
+                      {attachments.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No files uploaded for this block yet.</p>
+                      ) : (
+                        attachments.map((attachment) => (
+                          <div
+                            key={attachment.id}
+                            className="flex items-center justify-between rounded-md border border-border/60 bg-background px-3 py-2 text-xs"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium text-foreground">{attachment.name}</span>
+                              <a
+                                href={attachment.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] text-primary hover:underline"
+                              >
+                                Apri risorsa
+                              </a>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={deletingAttachmentId === attachment.id}
+                              onClick={() => handleBlockAttachmentDelete(lesson.id, block.id, attachment.id)}
+                            >
+                              {deletingAttachmentId === attachment.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
+
                 ) : block.type === 'QUIZ' ? (
                   <div className="space-y-2">
                     <div className="rounded-md border border-dashed border-border/40 bg-background/70 p-3 text-xs space-y-1">

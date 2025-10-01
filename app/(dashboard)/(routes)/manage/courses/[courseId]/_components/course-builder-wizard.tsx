@@ -9,7 +9,6 @@ import type {
   CourseAchievement as DbCourseAchievement,
   CourseModule as DbCourseModule,
   Lesson as DbLesson,
-  LessonBlock as DbLessonBlock,
 } from '@prisma/client'
 import {
   Award,
@@ -24,9 +23,8 @@ import {
 } from 'lucide-react'
 
 import Actions from './actions'
-import { AttachmentForm } from './attachment-form'
 import CourseBasicsForm from './course-basics-form'
-import { CurriculumManager, mapModuleFromDb } from './curriculum-manager'
+import { CurriculumManager, mapModuleFromDb, type ModulePayload } from './curriculum-manager'
 import { CourseAchievementsPanel } from './course-achievements-panel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -42,6 +40,13 @@ export type Module = {
   position: number
   isPublished: boolean
   lessons: Lesson[]
+}
+
+export type LessonAttachment = {
+  id: string
+  name: string
+  url: string
+  type: string | null
 }
 
 export type Lesson = {
@@ -72,10 +77,7 @@ export type LessonBlock = {
   position: number
   isPublished: boolean
   liveSessionConfig?: VirtualClassroomConfig | null
-}
-
-type DbModuleWithRelations = DbCourseModule & {
-  lessons: (DbLesson & { blocks: DbLessonBlock[] })[]
+  attachments?: LessonAttachment[]
 }
 
 type DbAchievementWithRelations = DbCourseAchievement & {
@@ -100,7 +102,7 @@ export type CourseAchievement = {
 
 export type CourseBuilderWizardProps = {
   course: Course & { attachments: Attachment[]; achievements: DbAchievementWithRelations[] }
-  modules: DbModuleWithRelations[]
+  modules: ModulePayload[]
   courseId: string
   completion: {
     completed: number
@@ -116,7 +118,7 @@ export type CourseBuilderWizardProps = {
   }
 }
 
-type StepId = 'basics' | 'curriculum' | 'resources' | 'achievements' | 'launch'
+type StepId = 'basics' | 'curriculum' | 'achievements' | 'launch'
 
 type StepDefinition = {
   id: StepId
@@ -143,13 +145,6 @@ const stepDefinitions: StepDefinition[] = [
     title: 'Curriculum & lessons',
     description: 'Chapters, videos and learning flow',
     icon: ListChecks,
-  },
-  {
-    id: 'resources',
-    title: 'Resources & files',
-    description: 'Supplemental docs and job aids',
-    icon: FolderOpen,
-    optional: true,
   },
   {
     id: 'achievements',
@@ -219,15 +214,45 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
   const hasBlocks = modules.some((module) =>
     module.lessons.some((lesson) => lesson.blocks.length > 0)
   )
-  const courseResources = course.attachments.filter((attachment) => attachment.chapterId == null)
-  const hasResources = course.attachments.length > 0
+  const totalUploadedResourcesFromBlocks = modules.reduce((moduleAcc, moduleItem) => {
+    return (
+      moduleAcc +
+      moduleItem.lessons.reduce((lessonAcc, lessonItem) => {
+        return (
+          lessonAcc +
+          lessonItem.blocks.reduce(
+            (blockAcc, blockItem) =>
+              blockAcc + (blockItem.type === 'RESOURCES' ? blockItem.attachments?.length ?? 0 : 0),
+            0,
+          )
+        )
+      }, 0)
+    )
+  }, 0)
+  const totalLinkedResourcesFromBlocks = modules.reduce((moduleAcc, moduleItem) => {
+    return (
+      moduleAcc +
+      moduleItem.lessons.reduce((lessonAcc, lessonItem) => {
+        return (
+          lessonAcc +
+          lessonItem.blocks.reduce(
+            (blockAcc, blockItem) =>
+              blockAcc + (blockItem.type === 'RESOURCES' && blockItem.contentUrl ? 1 : 0),
+            0,
+          )
+        )
+      }, 0)
+    )
+  }, 0)
+  const totalCourseAttachments = course.attachments.length
+  const totalUploadedResources = totalCourseAttachments + totalUploadedResourcesFromBlocks
+  const hasResources = totalUploadedResources > 0 || totalLinkedResourcesFromBlocks > 0
   const hasAchievements = achievements.length > 0
 
   const stepStates = useMemo<StepState[]>(() => {
     const completionMap: Record<StepId, boolean> = {
       basics: basicsComplete,
       curriculum: hasModules && hasLessons && hasBlocks,
-      resources: hasResources,
       achievements: hasAchievements,
       launch: hasModules && hasLessons && hasBlocks,
     }
@@ -243,7 +268,7 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
         isLocked,
       }
     })
-  }, [basicsComplete, hasModules, hasLessons, hasBlocks, hasResources, hasAchievements])
+  }, [basicsComplete, hasModules, hasLessons, hasBlocks, hasAchievements])
 
   const defaultStepId = useMemo<StepId>(() => {
     const firstPending = stepStates.find((step) => !step.isComplete && !step.optional)
@@ -277,11 +302,20 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
     0
   )
 
+  const resourcesSummaryParts: string[] = []
+  if (totalUploadedResources > 0) {
+    resourcesSummaryParts.push(`${totalUploadedResources} file${totalUploadedResources === 1 ? '' : 's'}`)
+  }
+  if (totalLinkedResourcesFromBlocks > 0) {
+    resourcesSummaryParts.push(`${totalLinkedResourcesFromBlocks} link${totalLinkedResourcesFromBlocks === 1 ? '' : 's'}`)
+  }
+  const resourcesSummary = resourcesSummaryParts.length > 0 ? resourcesSummaryParts.join(' • ') : '0'
+
   const stats = [
     { label: 'Modules', value: modules.length.toString() },
     { label: 'Lessons', value: totalLessons.toString() },
     { label: 'Content blocks', value: totalBlocks.toString() },
-    { label: 'Resources', value: course.attachments.length.toString() },
+    { label: 'Resources', value: resourcesSummary },
     { label: 'Achievements', value: achievements.length.toString() },
     { label: 'Estimated duration', value: formatDuration(course.estimatedDurationMinutes) },
     { label: 'Status', value: course.isPublished ? 'Published' : 'Draft' },
@@ -345,32 +379,6 @@ const CourseBuilderWizard = ({ course, modules: modulesProp, courseId, completio
               modules={modules}
               onModulesChange={setModules}
             />
-          </div>
-        )
-      case 'resources':
-        return (
-          <div className="space-y-6">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <FolderOpen className="h-4 w-4 text-primary" />
-                Resources
-              </div>
-              <h2 className="mt-2 text-xl font-semibold text-foreground">Bundle playbooks, templates and docs</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Upload slide decks, cheat sheets or policy documents so teams have everything in one place.
-              </p>
-            </div>
-            <AttachmentForm initialData={{ ...course, attachments: courseResources }} courseId={courseId} />
-            <Card className="rounded-xl border border-border/60 bg-muted/30 shadow-none">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base font-semibold">Suggested resources</CardTitle>
-                <CardDescription>Think onboarding checklists, SOPs, quizzes or templates that reinforce the lesson.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>Files are instantly available in the learner experience right below the video content.</p>
-                <p>Need something interactive? Link to your LMS quizzes or surveys and track completions via analytics.</p>
-              </CardContent>
-            </Card>
           </div>
         )
       case 'achievements':

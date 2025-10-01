@@ -3,7 +3,12 @@
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import type { CourseModule as DbCourseModule, Lesson as DbLesson, LessonBlock as DbLessonBlock } from '@prisma/client'
+import type {
+  CourseModule as DbCourseModule,
+  Lesson as DbLesson,
+  LessonBlock as DbLessonBlock,
+  LessonBlockAttachment as DbLessonBlockAttachment,
+} from '@prisma/client'
 import { Plus, FolderOpen, BookOpen, Video, FileText } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -11,15 +16,24 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ModuleAccordion, type Module, type Lesson, type LessonBlock, type VirtualClassroomConfig } from './module-accordion'
 
-type ModulePayload = DbCourseModule & {
-  lessons: (DbLesson & { blocks: DbLessonBlock[] })[]
-}
+type BlockPayload = DbLessonBlock & { attachments?: DbLessonBlockAttachment[] }
 
-type LessonPayload = DbLesson & { blocks: DbLessonBlock[] }
+type LessonPayload = DbLesson & { blocks: BlockPayload[] }
+
+export type ModulePayload = DbCourseModule & {
+  lessons: LessonPayload[]
+}
 
 const sortByPosition = <T extends { position: number }>(items: T[]) => [...items].sort((a, b) => a.position - b.position)
 
-const mapBlockFromDb = (block: DbLessonBlock): LessonBlock => ({
+const mapAttachmentFromDb = (attachment: DbLessonBlockAttachment) => ({
+  id: attachment.id,
+  name: attachment.name,
+  url: attachment.url,
+  type: attachment.type ?? null,
+})
+
+const mapBlockFromDb = (block: BlockPayload): LessonBlock => ({
   id: block.id,
   type: block.type,
   title: block.title,
@@ -29,6 +43,7 @@ const mapBlockFromDb = (block: DbLessonBlock): LessonBlock => ({
   position: block.position,
   isPublished: block.isPublished,
   liveSessionConfig: (block.liveSessionConfig as VirtualClassroomConfig | null) ?? null,
+  attachments: block.attachments?.map(mapAttachmentFromDb) ?? [],
 })
 
 const mapLessonFromDb = (lesson: LessonPayload): Lesson => ({
@@ -134,6 +149,70 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
                 lesson.id === lessonId
                   ? { ...lesson, blocks: [...lesson.blocks, block] }
                   : lesson,
+              ),
+            },
+      ),
+    )
+  }
+
+  const appendBlockAttachmentState = (
+    moduleId: string,
+    lessonId: string,
+    blockId: string,
+    attachment: LessonBlock['attachments'][number],
+  ) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id !== moduleId
+          ? module
+          : {
+              ...module,
+              lessons: module.lessons.map((lesson) =>
+                lesson.id !== lessonId
+                  ? lesson
+                  : {
+                      ...lesson,
+                      blocks: lesson.blocks.map((block) =>
+                        block.id !== blockId
+                          ? block
+                          : {
+                              ...block,
+                              attachments: [...(block.attachments ?? []), attachment],
+                            },
+                      ),
+                    },
+              ),
+            },
+      ),
+    )
+  }
+
+  const removeBlockAttachmentState = (
+    moduleId: string,
+    lessonId: string,
+    blockId: string,
+    attachmentId: string,
+  ) => {
+    onModulesChange((prev) =>
+      prev.map((module) =>
+        module.id !== moduleId
+          ? module
+          : {
+              ...module,
+              lessons: module.lessons.map((lesson) =>
+                lesson.id !== lessonId
+                  ? lesson
+                  : {
+                      ...lesson,
+                      blocks: lesson.blocks.map((block) =>
+                        block.id !== blockId
+                          ? block
+                          : {
+                              ...block,
+                              attachments: (block.attachments ?? []).filter((item) => item.id !== attachmentId),
+                            },
+                      ),
+                    },
               ),
             },
       ),
@@ -311,6 +390,51 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
     }
   }
 
+  const handleCreateBlockAttachment = async (
+    moduleId: string,
+    lessonId: string,
+    blockId: string,
+    payload: { url: string; name?: string | null; type?: string | null },
+  ) => {
+    const url = payload.url?.trim()
+    if (!url) {
+      return
+    }
+
+    try {
+      const response = await axios.post<DbLessonBlockAttachment>(
+        `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/blocks/${blockId}/attachments`,
+        {
+          url,
+          name: payload.name,
+          type: payload.type,
+        },
+      )
+      const attachment = mapAttachmentFromDb(response.data)
+      appendBlockAttachmentState(moduleId, lessonId, blockId, attachment)
+      toast.success('Resource added')
+    } catch {
+      toast.error('Unable to add file')
+    }
+  }
+
+  const handleDeleteBlockAttachment = async (
+    moduleId: string,
+    lessonId: string,
+    blockId: string,
+    attachmentId: string,
+  ) => {
+    try {
+      await axios.delete(
+        `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}/blocks/${blockId}/attachments/${attachmentId}`
+      )
+      removeBlockAttachmentState(moduleId, lessonId, blockId, attachmentId)
+      toast.success('Resource removed')
+    } catch {
+      toast.error('Unable to delete resource')
+    }
+  }
+
   const handleUpdateBlock = (
     moduleId: string,
     lessonId: string,
@@ -478,6 +602,8 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
               onUpdateBlock={handleUpdateBlock}
               onDeleteBlock={handleDeleteBlock}
               onPersistBlock={handlePersistBlock}
+              onCreateAttachment={handleCreateBlockAttachment}
+              onDeleteAttachment={handleDeleteBlockAttachment}
             />
           ))
         )}

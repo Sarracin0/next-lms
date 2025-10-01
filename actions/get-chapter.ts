@@ -103,6 +103,7 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
       where: { legacyChapterId: chapter.id },
       select: {
         id: true,
+        lessonId: true,
         type: true,
         liveSessionConfig: true,
         liveSession: {
@@ -124,11 +125,39 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
       },
     })
 
-    const attachments = await db.attachment.findMany({
-      where: { courseId },
-      select: { id: true, name: true, url: true, type: true },
+    const legacyAttachments = await db.attachment.findMany({
+      where: {
+        courseId,
+        OR: [
+          { chapterId: chapter.id },
+          { chapterId: null },
+        ],
+      },
+      select: { id: true, name: true, url: true, type: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     })
+
+    const blockAttachments = lessonBlock
+      ? await db.lessonBlockAttachment.findMany({
+          where: {
+            OR: [
+              { blockId: lessonBlock.id },
+              {
+                block: {
+                  lessonId: lessonBlock.lessonId,
+                  type: BlockType.RESOURCES,
+                },
+              },
+            ],
+          },
+          select: { id: true, name: true, url: true, type: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        })
+      : []
+
+    const attachments = [...legacyAttachments, ...blockAttachments]
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .map(({ id, name, url, type }) => ({ id, name, url, type }))
 
     const nextChapter = await db.chapter.findFirst({
       where: { courseId, isPublished: true, position: { gt: chapter.position } },
