@@ -370,6 +370,8 @@ export const ModuleAccordion = ({
               isOpen={openLessons.has(lesson.id)}
               editingLesson={editingLesson}
               editingBlock={editingBlock}
+              pendingAttachmentBlockId={pendingAttachmentBlockId}
+              deletingAttachmentId={deletingAttachmentId}
               onToggle={() => toggleLesson(lesson.id)}
               onLessonEdit={handleLessonEdit}
               onLessonUpdate={handleLessonUpdate}
@@ -382,6 +384,8 @@ export const ModuleAccordion = ({
               onAddBlock={onAddBlock}
               onDeleteLesson={onDeleteLesson}
               onDeleteBlock={onDeleteBlock}
+              handleBlockAttachmentUpload={handleBlockAttachmentUpload}
+              handleBlockAttachmentDelete={handleBlockAttachmentDelete}
               handleKeyDown={handleKeyDown}
               courseId={courseId}
             />
@@ -404,6 +408,8 @@ interface LessonItemProps {
     id: string
     field: 'title' | 'content' | 'videoUrl' | 'contentUrl'
   } | null
+  pendingAttachmentBlockId: string | null
+  deletingAttachmentId: string | null
   onToggle: () => void
   onLessonEdit: (lessonId: string, field: 'title' | 'description') => void
   onLessonUpdate: (lessonId: string, field: keyof Lesson, value: string | boolean) => void
@@ -416,31 +422,43 @@ interface LessonItemProps {
   onAddBlock: (moduleId: string, lessonId: string, type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ') => void
   onDeleteLesson: (moduleId: string, lessonId: string) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
+  handleBlockAttachmentUpload: (
+    lessonId: string,
+    blockId: string,
+    file?: { url?: string | null; ufsUrl?: string | null; appUrl?: string | null; name?: string | null; type?: string | null },
+  ) => Promise<void>
+  handleBlockAttachmentDelete: (lessonId: string, blockId: string, attachmentId: string) => Promise<void>
   handleKeyDown: (e: React.KeyboardEvent, saveHandler: () => void) => void
   courseId?: string
 }
 
-const LessonItem = ({
-  lesson,
-  moduleId,
-  isOpen,
-  editingLesson,
-  editingBlock,
-  onToggle,
-  onLessonEdit,
-  onLessonUpdate,
-  onLessonSave,
-  onLessonTogglePublish,
-  onBlockEdit,
-  onBlockUpdate,
-  onBlockSave,
-  onBlockTogglePublish,
-  onAddBlock,
-  onDeleteLesson,
-  onDeleteBlock,
-  handleKeyDown,
-  courseId,
-}: LessonItemProps) => {
+const LessonItem = (props: LessonItemProps) => {
+  const {
+    lesson,
+    moduleId,
+    isOpen,
+    editingLesson,
+    editingBlock,
+    onToggle,
+    onLessonEdit,
+    onLessonUpdate,
+    onLessonSave,
+    onLessonTogglePublish,
+    onBlockEdit,
+    onBlockUpdate,
+    onBlockSave,
+    onBlockTogglePublish,
+    onAddBlock,
+    onDeleteLesson,
+    onDeleteBlock,
+    handleBlockAttachmentUpload,
+    handleBlockAttachmentDelete,
+    handleKeyDown,
+    courseId,
+  } = props
+
+  const pendingAttachmentBlockId = props.pendingAttachmentBlockId ?? null
+  const deletingAttachmentId = props.deletingAttachmentId ?? null
   const lessonInputRef = useRef<HTMLInputElement>(null)
   const lessonTextareaRef = useRef<HTMLTextAreaElement>(null)
 
