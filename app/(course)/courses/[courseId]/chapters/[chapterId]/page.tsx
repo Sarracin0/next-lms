@@ -82,7 +82,7 @@ export default async function ChapterDetails({ params }: ChapterDetailsProps) {
           )}
         </div>
 
-        {/* Video / Live session block */}
+        {/* Video / Live session / Resources block */}
         <div className="rounded-2xl border border-white/20 bg-white/60 p-2 backdrop-blur-md supports-[backdrop-filter]:bg-white/50">
           {block?.type === 'LIVE_SESSION' ? (
             <VirtualClassroomCard
@@ -93,6 +93,53 @@ export default async function ChapterDetails({ params }: ChapterDetailsProps) {
               scheduledFor={liveSessionScheduledFor}
               isLocked={isLocked}
             />
+          ) : block?.type === 'RESOURCES' ? (
+            <div className="space-y-4 rounded-xl border border-white/30 bg-white/60 p-4 text-foreground backdrop-blur supports-[backdrop-filter]:bg-white/50">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold">{block.title || chapter.title}</h2>
+                {block.content ? (
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">{block.content}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Materiali aggiuntivi per questa lezione.</p>
+                )}
+              </div>
+
+              {block.contentUrl ? (
+                <a
+                  href={block.contentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+                >
+                  Apri link esterno
+                </a>
+              ) : null}
+
+              <Separator className="bg-white/30" />
+
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Documenti allegati</h3>
+                {block.attachments && block.attachments.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {block.attachments.map((attachment) => (
+                      <a
+                        key={attachment.id}
+                        className="flex w-full items-center justify-between rounded-lg border border-white/40 bg-white/60 p-3 text-sm text-foreground transition-colors backdrop-blur-md supports-[backdrop-filter]:bg-white/50 hover:bg-white/70"
+                        target="_blank"
+                        href={attachment.url}
+                        rel="noreferrer"
+                      >
+                        {attachment.name}
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {isLocked ? 'Iscriviti al corso per scaricare i documenti allegati.' : 'Nessun documento caricato per questo blocco.'}
+                  </p>
+                )}
+              </div>
+            </div>
           ) : (
             <VideoPlayer
               chapterId={chapter.id}
@@ -116,7 +163,7 @@ export default async function ChapterDetails({ params }: ChapterDetailsProps) {
         </div>
 
         {/* Attachments (already styled to glass links) */}
-        {attachments && attachments.length > 0 ? (
+        {attachments && attachments.length > 0 && block?.type !== 'RESOURCES' ? (
           <div className="space-y-2">
             {attachments.map((attachment) => (
               <a

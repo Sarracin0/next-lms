@@ -35,6 +35,9 @@ type ChapterAccessResponse = {
     | {
         id: string
         type: BlockType
+        title: string
+        content: string | null
+        contentUrl: string | null
         liveSessionConfig: Record<string, unknown> | null
         liveSession:
           | {
@@ -43,6 +46,7 @@ type ChapterAccessResponse = {
               durationMinutes: number | null
             }
           | null
+        attachments: { id: string; name: string; url: string; type: string | null }[]
       }
     | null
 }
@@ -105,6 +109,9 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
         id: true,
         lessonId: true,
         type: true,
+        title: true,
+        content: true,
+        contentUrl: true,
         liveSessionConfig: true,
         liveSession: {
           select: {
@@ -150,14 +157,31 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
               },
             ],
           },
-          select: { id: true, name: true, url: true, type: true, createdAt: true },
+          select: { id: true, name: true, url: true, type: true, createdAt: true, blockId: true },
           orderBy: { createdAt: 'asc' },
         })
       : []
 
-    const attachments = [...legacyAttachments, ...blockAttachments]
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    const normalizedLegacyAttachments = legacyAttachments.map((attachment) => ({
+      ...attachment,
+      createdAtMs: attachment.createdAt.getTime(),
+    }))
+
+    const normalizedBlockAttachments = blockAttachments.map((attachment) => ({
+      ...attachment,
+      createdAtMs: attachment.createdAt.getTime(),
+    }))
+
+    const attachments = [...normalizedLegacyAttachments, ...normalizedBlockAttachments]
+      .sort((a, b) => a.createdAtMs - b.createdAtMs)
       .map(({ id, name, url, type }) => ({ id, name, url, type }))
+
+    const attachmentsForCurrentBlock = lessonBlock
+      ? normalizedBlockAttachments
+          .filter((attachment) => attachment.blockId === lessonBlock.id)
+          .sort((a, b) => a.createdAtMs - b.createdAtMs)
+          .map(({ id, name, url, type }) => ({ id, name, url, type }))
+      : []
 
     const nextChapter = await db.chapter.findFirst({
       where: { courseId, isPublished: true, position: { gt: chapter.position } },
@@ -176,6 +200,7 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
 
     const canAccessContent = Boolean(enrollment || chapter.isPreview)
     const visibleAttachments = enrollment ? attachments : []
+    const visibleBlockAttachments = enrollment ? attachmentsForCurrentBlock : []
 
     return {
       course,
@@ -189,8 +214,12 @@ export async function getChapter({ userProfileId, companyId, courseId, chapterId
         ? {
             id: lessonBlock.id,
             type: lessonBlock.type,
+            title: lessonBlock.title,
+            content: lessonBlock.content ?? null,
+            contentUrl: lessonBlock.contentUrl ?? null,
             liveSessionConfig: (lessonBlock.liveSessionConfig as Record<string, unknown> | null) ?? null,
             liveSession: lessonBlock.liveSession,
+            attachments: visibleBlockAttachments,
           }
         : null,
     }

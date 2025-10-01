@@ -3,6 +3,7 @@ import { UserRole } from '@prisma/client'
 
 import { db } from '@/lib/db'
 import { assertRole, requireAuthContext } from '@/lib/current-profile'
+import { syncLegacyChapterForBlock } from '@/lib/sync-legacy-chapter'
 import { logError } from '@/lib/logger'
 
 type RouteParams = Promise<{
@@ -59,6 +60,8 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
         type: rawType || null,
       },
     })
+
+    await syncLegacyChapterForBlock(blockId)
 
     return NextResponse.json(attachment, { status: 201 })
   } catch (error) {
