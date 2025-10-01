@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { VideoInput } from './video-input'
 
 export type VirtualClassroomConfig = {
@@ -448,42 +449,37 @@ const LessonItem = ({
         </div>
 
         <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onAddBlock(moduleId, lesson.id, 'VIDEO_LESSON')}
-            className="h-6 w-6 p-0"
-            title="Add Video Block"
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onAddBlock(moduleId, lesson.id, 'RESOURCES')}
-            className="h-6 w-6 p-0"
-            title="Add Resource Block"
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onAddBlock(moduleId, lesson.id, 'LIVE_SESSION')}
-            className="h-6 w-6 p-0"
-            title="Add Virtual Classroom"
-          >
-            <Cast className="h-3 w-3" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onAddBlock(moduleId, lesson.id, 'QUIZ')}
-            className="h-6 w-6 p-0"
-            title="Add Quiz"
-          >
-            <ListChecks className="h-3 w-3" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                title="Aggiungi blocco"
+                aria-label="Aggiungi blocco"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => onAddBlock(moduleId, lesson.id, 'VIDEO_LESSON')}>
+                <Video className="mr-2 h-3.5 w-3.5 text-[#5D62E1]" />
+                <span>Video lesson</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAddBlock(moduleId, lesson.id, 'RESOURCES')}>
+                <FileText className="mr-2 h-3.5 w-3.5 text-[#5D62E1]" />
+                <span>Resources</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAddBlock(moduleId, lesson.id, 'LIVE_SESSION')}>
+                <Cast className="mr-2 h-3.5 w-3.5 text-[#5D62E1]" />
+                <span>Virtual classroom</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAddBlock(moduleId, lesson.id, 'QUIZ')}>
+                <ListChecks className="mr-2 h-3.5 w-3.5 text-[#5D62E1]" />
+                <span>Quiz</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             size="sm"
             variant="ghost"
