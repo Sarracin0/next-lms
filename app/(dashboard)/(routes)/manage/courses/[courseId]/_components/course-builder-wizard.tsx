@@ -64,7 +64,7 @@ export type VirtualClassroomConfig = {
 
 export type LessonBlock = {
   id: string
-  type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION'
+  type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ'
   title: string
   content?: string
   videoUrl?: string

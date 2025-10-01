@@ -286,7 +286,7 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
   const handleAddBlock = async (
     moduleId: string,
     lessonId: string,
-    type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION',
+    type: 'VIDEO_LESSON' | 'RESOURCES' | 'LIVE_SESSION' | 'QUIZ',
   ) => {
     try {
       const response = await axios.post<DbLessonBlock>(
@@ -298,7 +298,9 @@ export const CurriculumManager = ({ courseId, modules, onModulesChange }: Curric
               ? 'New Video Lesson'
               : type === 'RESOURCES'
                 ? 'New Resources'
-                : 'Aula virtuale BigBlueButton',
+                : type === 'QUIZ'
+                  ? 'New Quiz'
+                  : 'Aula virtuale BigBlueButton',
         },
       )
       const block = mapBlockFromDb(response.data)

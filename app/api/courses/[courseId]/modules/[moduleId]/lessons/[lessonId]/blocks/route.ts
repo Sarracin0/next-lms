@@ -112,6 +112,26 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
       },
     })
 
+    // If this is a QUIZ block, initialize a Quiz record linked 1:1
+    if (type === BlockType.QUIZ) {
+      await db.quiz.create({
+        data: {
+          companyId: company.id,
+          createdByProfileId: profile.id,
+          lessonBlockId: block.id,
+          title,
+          description: baseContent,
+          passScore: 70,
+          maxAttempts: 3,
+          timeLimitSeconds: 600,
+          shuffleQuestions: true,
+          shuffleOptions: true,
+          pointsReward: 100,
+          isPublished: false,
+        },
+      })
+    }
+
     await syncLegacyChapterForBlock(block.id)
 
     return NextResponse.json(block, { status: 201 })

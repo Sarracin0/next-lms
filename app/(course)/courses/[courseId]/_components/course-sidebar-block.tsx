@@ -45,6 +45,11 @@ export default function CourseSidebarBlock({ block, lessonId, courseId, isLocked
 
     // Comportamento per tipo di blocco
     switch (block.type) {
+      case 'QUIZ': {
+        // Apri la pagina quiz per questo block
+        router.push(`/courses/${courseId}/quizzes/${block.id}`)
+        return
+      }
       case 'RESOURCES': {
         // Apri direttamente la risorsa se disponibile; altrimenti prova la chapter legacy
         if (block.contentUrl) {
