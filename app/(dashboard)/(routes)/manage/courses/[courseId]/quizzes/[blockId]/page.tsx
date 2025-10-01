@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { assertRole, requireAuthContext } from '@/lib/current-profile'
 import { db } from '@/lib/db'
 import { UserRole } from '@prisma/client'
+import { ArrowLeft } from 'lucide-react'
 import QuizEditor from './_components/quiz-editor'
 
 export default async function ManageQuizPage({ params }: { params: Promise<{ courseId: string; blockId: string }> }) {
@@ -50,9 +52,18 @@ export default async function ManageQuizPage({ params }: { params: Promise<{ cou
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Quiz builder</h1>
-        <p className="text-sm text-muted-foreground">Configura le domande, le opzioni e i punteggi per il quiz</p>
+      <div className="flex items-start gap-3">
+        <Link
+          href={`/manage/courses/${courseId}`}
+          className="inline-flex items-center rounded-md p-1 hover:bg-muted/60 transition"
+          aria-label="Torna al builder"
+        >
+          <ArrowLeft className="h-5 w-5 text-[#5D62E1]" />
+        </Link>
+        <div>
+          <h1 className="text-xl font-semibold">Quiz builder</h1>
+          <p className="text-sm text-muted-foreground">Configura le domande, le opzioni e i punteggi per il quiz</p>
+        </div>
       </div>
       <QuizEditor
         courseId={courseId}
