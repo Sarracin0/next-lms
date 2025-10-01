@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff, Cast, ListChecks } from 'lucide-react'
+import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff, Cast, ListChecks, Video, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -531,19 +531,18 @@ const LessonItem = ({
 
           {/* Blocks */}
           <div className="space-y-2">
-            {lesson.blocks.map((block) => (
-              <div key={block.id} className="bg-muted/30 rounded-md p-3">
-                <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    {block.type === 'VIDEO_LESSON'
-                      ? 'Video'
-                      : block.type === 'RESOURCES'
-                        ? 'Resources'
-                        : block.type === 'QUIZ'
-                          ? 'Quiz'
-                          : 'Virtual classroom'}
-                  </Badge>
+            {lesson.blocks.map((block) => {
+              const BlockIcon = block.type === 'VIDEO_LESSON' ? Video : block.type === 'RESOURCES' ? FileText : block.type === 'QUIZ' ? ListChecks : Cast
+              const blockLabel = block.type === 'VIDEO_LESSON' ? 'Video' : block.type === 'RESOURCES' ? 'Resources' : block.type === 'QUIZ' ? 'Quiz' : 'Virtual classroom'
+              return (
+              <div key={block.id} className="group relative rounded-xl border border-border/50 bg-card/60 p-3 transition hover:bg-muted/30">
+                <div className="pointer-events-none absolute left-0 top-0 h-full w-[3px] rounded-l-md bg-[#5D62E1] opacity-70" />
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#5D62E1]/10 text-[#5D62E1] ring-1 ring-[#5D62E1]/20">
+                      <BlockIcon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{blockLabel}</span>
 
                     {editingBlock?.lessonId === lesson.id && editingBlock.id === block.id && editingBlock.field === 'title' ? (
                       <Input
@@ -551,12 +550,12 @@ const LessonItem = ({
                         onChange={(e) => onBlockUpdate(lesson.id, block.id, 'title', e.target.value)}
                         onBlur={onBlockSave}
                         onKeyDown={(e) => handleKeyDown(e, onBlockSave)}
-                        className="h-5 text-sm"
+                        className="h-6 text-sm"
                         autoFocus
                       />
                     ) : (
                       <span
-                        className="text-sm font-medium cursor-pointer hover:text-primary transition-colors"
+                        className="cursor-pointer text-sm font-medium transition-colors hover:text-primary"
                         onClick={() => onBlockEdit(lesson.id, block.id, 'title')}
                       >
                         {block.title}
@@ -706,7 +705,7 @@ const LessonItem = ({
                       <p className="text-xs text-muted-foreground">
                         Stato: {block.liveSessionConfig?.status ?? 'offline'}
                       </p>
-                      {block.liveSessionConfig?.scheduledFor ? (
+                    {block.liveSessionConfig?.scheduledFor ? (
                         <p className="text-xs text-muted-foreground">
                           Programmata per{' '}
                           {new Date(block.liveSessionConfig.scheduledFor).toLocaleString()}
@@ -754,7 +753,7 @@ const LessonItem = ({
                   </div>
                 )}
               </div>
-            ))}
+              )})}
           </div>
         </div>
       )}
