@@ -64,17 +64,17 @@ function StatsCard({ title, value, subtitle, icon: Icon, trend }: StatsCardProps
   return (
     <Card className={cn(
       "group relative overflow-hidden",
-      "bg-white border border-gray-200/60",
-      "hover:border-gray-900/20 hover:shadow-md",
+      "border border-white/20 bg-white/60 backdrop-blur-md supports-[backdrop-filter]:bg-white/50",
+      "hover:bg-white/70 hover:shadow-md",
       "transition-all duration-200"
     )}>
       <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-6">
-          <div className="p-2 rounded-lg bg-gray-900">
+        <div className="mb-6 flex items-start justify-between">
+          <div className="rounded-lg bg-[#5D62E1] p-2">
             <Icon className="h-4 w-4 text-white" />
           </div>
           {trend && (
-            <div className="flex items-center gap-1 text-emerald-600">
+            <div className="flex items-center gap-1 text-[#5D62E1]">
               <TrendingUp className="h-3 w-3" />
               <span className="text-xs font-semibold">
                 +{trend.value}
@@ -114,16 +114,15 @@ function CourseCard({ course, isEnrolled = false }: CourseCardProps) {
   return (
     <Link href={href} className="group block">
       <div className={cn(
-        "relative p-6 border border-gray-200/80",
-        "bg-white hover:border-gray-900/40",
-        "transition-all duration-200",
-        "hover:shadow-sm"
+        "relative p-6",
+        "border border-white/30 bg-white/60 backdrop-blur-md supports-[backdrop-filter]:bg-white/50",
+        "transition-all duration-200 hover:bg-white/70 hover:shadow-sm"
       )}>
         {/* Progress indicator bar - only for enrolled courses */}
         {isEnrolled && typeof course.progress === 'number' && (
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100">
+          <div className="absolute left-0 right-0 top-0 h-1 bg-white/30">
             <div 
-              className="h-full bg-gray-900 transition-all duration-300" 
+              className="h-full bg-[#5D62E1] transition-all duration-300" 
               style={{ width: `${course.progress}%` }}
             />
           </div>
@@ -148,17 +147,17 @@ function CourseCard({ course, isEnrolled = false }: CourseCardProps) {
               )}
             </div>
             
-            <ArrowUpRight className="h-4 w-4 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+            <ArrowUpRight className="h-4 w-4 text-gray-400 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#5D62E1]" />
           </div>
           
           {/* Title */}
-          <h3 className="font-semibold text-lg text-gray-900 leading-tight">
+          <h3 className="leading-tight text-lg font-semibold text-gray-900 group-hover:text-[#5D62E1]">
             {course.title}
           </h3>
           
           {/* Description */}
           {course.description && (
-            <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+            <p className="line-clamp-2 leading-relaxed text-sm text-gray-600">
               {course.description}
             </p>
           )}
@@ -178,7 +177,7 @@ function CourseCard({ course, isEnrolled = false }: CourseCardProps) {
           {/* Status indicator */}
           {!isEnrolled && (
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <Circle className="h-2 w-2 fill-gray-400" />
+              <Circle className="h-2 w-2 fill-[#5D62E1] text-[#5D62E1]" />
               <span>Disponibile</span>
             </div>
           )}
@@ -187,7 +186,6 @@ function CourseCard({ course, isEnrolled = false }: CourseCardProps) {
     </Link>
   )
 }
-
 // Minimalist Calendar Component
 interface CalendarProps {
   upcomingCount: number
@@ -201,15 +199,15 @@ function MinimalCalendar({ upcomingCount }: CalendarProps) {
   const monthYear = format(today, 'MMMM yyyy', { locale: it })
   const dayNames = ['L', 'M', 'M', 'G', 'V', 'S', 'D']
 
-  return (
-    <Card className="border border-gray-200/80 bg-white">
+return (
+    <Card className="border border-white/20 bg-white/60 backdrop-blur-md supports-[backdrop-filter]:bg-white/50">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold text-gray-900 capitalize">
             {monthYear}
           </CardTitle>
           {upcomingCount > 0 && (
-            <Badge variant="secondary" className="bg-gray-900 text-white hover:bg-gray-900">
+            <Badge variant="secondary" className="bg-[#5D62E1] text-white hover:bg-[#5055c9]">
               {upcomingCount}
             </Badge>
           )}
@@ -225,9 +223,9 @@ function MinimalCalendar({ upcomingCount }: CalendarProps) {
                 className={cn(
                   "w-8 h-8 flex items-center justify-center text-sm font-medium",
                   "transition-colors duration-200",
-                  isToday(weekDays[i])
-                    ? "bg-gray-900 text-white rounded-md"
-                    : "text-gray-600 hover:bg-gray-50 rounded-md"
+isToday(weekDays[i])
+                    ? "rounded-md bg-[#5D62E1] text-white"
+                    : "rounded-md text-gray-600 hover:bg-white/50"
                 )}
               >
                 {format(weekDays[i], 'd')}
@@ -266,8 +264,8 @@ interface AchievementCardProps {
 }
 
 function MinimalAchievementCard({ badges }: AchievementCardProps) {
-  return (
-    <Card className="border border-gray-200/80 bg-white">
+return (
+    <Card className="border border-white/20 bg-white/60 backdrop-blur-md supports-[backdrop-filter]:bg-white/50">
       <CardHeader className="pb-4">
         <CardTitle className="text-base font-semibold text-gray-900">
           Achievement recenti
@@ -281,7 +279,7 @@ function MinimalAchievementCard({ badges }: AchievementCardProps) {
                 key={userBadge.id} 
                 className="flex items-start gap-3 pb-3 border-b border-gray-100 last:border-0 last:pb-0"
               >
-                <div className="w-10 h-10 rounded-md bg-gray-900 flex items-center justify-center flex-shrink-0">
+<div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-[#5D62E1]">
                   <Trophy className="h-4 w-4 text-white" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -295,7 +293,7 @@ function MinimalAchievementCard({ badges }: AchievementCardProps) {
           </div>
         ) : (
           <div className="text-center py-8">
-            <div className="w-12 h-12 rounded-md bg-gray-100 flex items-center justify-center mx-auto mb-3">
+<div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-md bg-white/60 backdrop-blur-md supports-[backdrop-filter]:bg-white/50">
               <Trophy className="h-5 w-5 text-gray-400" />
             </div>
             <p className="text-sm text-gray-600">Nessun achievement</p>
@@ -331,20 +329,20 @@ function QuickActions() {
     },
   ]
 
-  return (
-    <Card className="border border-gray-200/80 bg-white">
+return (
+    <Card className="border border-white/20 bg-white/60 backdrop-blur-md supports-[backdrop-filter]:bg-white/50">
       <CardContent className="p-4">
         <div className="space-y-2">
           {actions.map((action) => {
             const Icon = action.icon
             return (
-              <Link key={action.href} href={action.href}>
-                <div className="group flex items-center justify-between p-3 hover:bg-gray-50 rounded-md transition-colors">
+<Link key={action.href} href={action.href}>
+                <div className="group flex items-center justify-between rounded-md p-3 transition-colors hover:bg-white/50">
                   <div className="flex items-center gap-3">
                     <Icon className="h-4 w-4 text-gray-600" />
                     <span className="text-sm font-medium text-gray-900">{action.label}</span>
                   </div>
-                  <ArrowUpRight className="h-4 w-4 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+<ArrowUpRight className="h-4 w-4 text-gray-400 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-[#5D62E1]" />
                 </div>
               </Link>
             )
@@ -504,7 +502,7 @@ export default async function Dashboard() {
                   <div className="flex items-end justify-between border-b border-gray-200 pb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="w-1 h-4 bg-gray-900" />
+<div className="h-4 w-1 bg-[#5D62E1]" />
                         <h2 className="text-2xl font-bold tracking-tight text-gray-900">In Corso</h2>
                       </div>
                       <p className="text-sm text-gray-600">
@@ -533,7 +531,7 @@ export default async function Dashboard() {
                 <div className="flex items-end justify-between border-b border-gray-200 pb-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="w-1 h-4 bg-gray-900" />
+<div className="h-4 w-1 bg-[#5D62E1]" />
                       <h2 className="text-2xl font-bold tracking-tight text-gray-900">
                         {inProgressCourses.length > 0 ? 'Esplora Catalogo' : 'Inizia Ora'}
                       </h2>
@@ -574,7 +572,7 @@ export default async function Dashboard() {
                   <div className="flex items-end justify-between border-b border-gray-200 pb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="w-1 h-4 bg-gray-400" />
+<div className="h-4 w-1 bg-[#5D62E1]/50" />
                         <h2 className="text-xl font-semibold tracking-tight text-gray-900">Completati</h2>
                       </div>
                       <p className="text-sm text-gray-600">
@@ -595,7 +593,7 @@ export default async function Dashboard() {
                       <Link key={course.id} href={`/courses/${course.id}`}>
                         <div className="flex items-center justify-between p-4 border border-gray-200 hover:border-gray-900/40 hover:bg-gray-50 transition-all group">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded bg-gray-900 flex items-center justify-center flex-shrink-0">
+<div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-[#5D62E1]">
                               <GraduationCap className="h-4 w-4 text-white" />
                             </div>
                             <div className="min-w-0">
@@ -605,7 +603,7 @@ export default async function Dashboard() {
                               )}
                             </div>
                           </div>
-                          <ArrowUpRight className="h-4 w-4 text-gray-400 group-hover:text-gray-900 flex-shrink-0 ml-2" />
+<ArrowUpRight className="ml-2 h-4 w-4 flex-shrink-0 text-gray-400 transition-colors group-hover:text-[#5D62E1]" />
                         </div>
                       </Link>
                     ))}
@@ -619,12 +617,12 @@ export default async function Dashboard() {
           <div className="space-y-6">
             
             {/* Profile Card */}
-            <Card className="border border-gray-200/80 bg-white">
+<Card className="border border-white/20 bg-white/60 backdrop-blur-md supports-[backdrop-filter]:bg-white/50">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
-                  <Avatar className="h-14 w-14 ring-2 ring-gray-100">
+<Avatar className="h-14 w-14 ring-2 ring-[#5D62E1]/20">
                     <AvatarImage src={profile.avatarUrl || undefined} />
-                    <AvatarFallback className="bg-gray-900 text-white font-semibold text-base">
+<AvatarFallback className="bg-[#5D62E1] text-white font-semibold text-base">
                       {userName.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -644,7 +642,7 @@ export default async function Dashboard() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Punti totali</span>
                   <div className="flex items-center gap-1.5">
-                    <Star className="h-4 w-4 text-gray-900 fill-gray-900" />
+<Star className="h-4 w-4 text-[#5D62E1] fill-[#5D62E1]" />
                     <span className="text-sm font-semibold text-gray-900">{profile.points}</span>
                   </div>
                 </div>

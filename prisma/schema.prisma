@@ -70,6 +70,12 @@ enum BlockType {
   QUIZ
 }
 
+enum QuizQuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
 enum CourseEnrollmentStatus {
   NOT_STARTED
   IN_PROGRESS
@@ -109,6 +115,7 @@ model Company {
   quests       Quest[]
   leaderboards Leaderboard[]
   liveSessions LiveSession[]
+  quizzes      Quiz[]
 }
 
 model UserProfile {
@@ -146,6 +153,8 @@ model UserProfile {
   lessonProgress          UserLessonProgress[]
   achievementsUnlocked    UserCourseAchievement[]
   achievementsCreated     CourseAchievement[]     @relation("CourseAchievementCreatedBy")
+  quizzesCreated          Quiz[]                  @relation("QuizCreatedBy")
+  quizAttempts            QuizAttempt[]           @relation("QuizAttemptUser")
 }
 
 model CompanyTeam {
@@ -515,7 +524,123 @@ model LessonBlock {
   liveSession        LiveSession? @relation(fields: [liveSessionId], references: [id], onDelete: SetNull)
   liveSessionConfig  Json?
 
+  quiz Quiz? @relation("BlockQuiz")
+
   @@index([lessonId])
+}
+
+model Quiz {
+  id                 String    @id @default(cuid())
+  companyId          String
+  createdByProfileId String
+  lessonBlockId      String   @unique
+  title              String
+  description        String?
+  passScore          Int       @default(70)
+  maxAttempts        Int?
+  timeLimitSeconds   Int?
+  shuffleQuestions   Boolean   @default(false)
+  shuffleOptions     Boolean   @default(false)
+  pointsReward       Int       @default(0)
+  isPublished        Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy  UserProfile @relation("QuizCreatedBy", fields: [createdByProfileId], references: [id], onDelete: Cascade)
+  lessonBlock LessonBlock @relation("BlockQuiz", fields: [lessonBlockId], references: [id], onDelete: Cascade)
+  questions  QuizQuestion[]
+  attempts   QuizAttempt[]
+
+  @@index([companyId])
+  @@index([createdByProfileId])
+}
+
+model QuizQuestion {
+  id          String           @id @default(cuid())
+  quizId      String
+  position    Int              @default(0)
+  type        QuizQuestionType @default(MULTIPLE_CHOICE)
+  text        String
+  explanation String?
+  required    Boolean          @default(false)
+  points      Int              @default(1)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  quiz     Quiz        @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options  QuizOption[]
+  answers  QuizAnswer[]
+
+  @@index([quizId])
+}
+
+model QuizOption {
+  id         String   @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean  @default(false)
+  points     Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers  QuizAnswerOption[]
+
+  @@index([questionId])
+}
+
+model QuizAttempt {
+  id             String      @id @default(cuid())
+  quizId         String
+  userProfileId  String
+  attemptNumber  Int         @default(1)
+  submittedAt    DateTime?
+  score          Int         @default(0)
+  passed         Boolean     @default(false)
+  durationSeconds Int?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  quiz        Quiz        @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userProfile UserProfile @relation("QuizAttemptUser", fields: [userProfileId], references: [id], onDelete: Cascade)
+  answers     QuizAnswer[]
+
+  @@unique([quizId, userProfileId, attemptNumber])
+  @@index([quizId])
+  @@index([userProfileId])
+}
+
+model QuizAnswer {
+  id          String     @id @default(cuid())
+  attemptId   String
+  questionId  String
+  freeText    String?
+  isCorrect   Boolean?
+  scoreAwarded Int       @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  attempt  QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  options  QuizAnswerOption[]
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+model QuizAnswerOption {
+  id        String   @id @default(cuid())
+  answerId  String
+  optionId  String
+  createdAt DateTime @default(now())
+
+  answer QuizAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  option QuizOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([answerId, optionId])
+  @@index([optionId])
 }
 
 model LessonBlockAttachment {

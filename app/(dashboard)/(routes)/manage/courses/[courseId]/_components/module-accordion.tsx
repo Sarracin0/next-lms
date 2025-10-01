@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import { Plus, Trash2, Edit3, ChevronDown, ChevronRight, Eye, EyeOff, Cast, ListChecks } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -76,6 +77,8 @@ export const ModuleAccordion = ({
   onDeleteBlock,
   onPersistBlock,
 }: ModuleAccordionProps) => {
+  const params = useParams() as { courseId?: string }
+  const courseId = params?.courseId ?? ''
   // Stati di editing
   const [editingModule, setEditingModule] = useState<{ field: 'title' | 'description' | null }>({ field: null })
   const [editingLesson, setEditingLesson] = useState<{ id: string; field: 'title' | 'description' } | null>(null)
@@ -321,6 +324,7 @@ export const ModuleAccordion = ({
               onDeleteLesson={onDeleteLesson}
               onDeleteBlock={onDeleteBlock}
               handleKeyDown={handleKeyDown}
+              courseId={courseId}
             />
             ))}
           </div>
@@ -354,6 +358,7 @@ interface LessonItemProps {
   onDeleteLesson: (moduleId: string, lessonId: string) => void
   onDeleteBlock: (moduleId: string, lessonId: string, blockId: string) => void
   handleKeyDown: (e: React.KeyboardEvent, saveHandler: () => void) => void
+  courseId?: string
 }
 
 const LessonItem = ({
@@ -375,6 +380,7 @@ const LessonItem = ({
   onDeleteLesson,
   onDeleteBlock,
   handleKeyDown,
+  courseId,
 }: LessonItemProps) => {
   const lessonInputRef = useRef<HTMLInputElement>(null)
   const lessonTextareaRef = useRef<HTMLTextAreaElement>(null)
@@ -686,7 +692,7 @@ const LessonItem = ({
                       </p>
                     )}
 
-                    <a href={'quizzes/' + block.id} className="inline-flex items-center text-xs text-primary hover:underline">
+<a href={(courseId ? '/manage/courses/' + courseId + '/quizzes/' + block.id : 'quizzes/' + block.id)} className="inline-flex items-center text-xs text-primary hover:underline">
                       Apri editor quiz
                     </a>
                   </div>
