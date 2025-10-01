@@ -33,19 +33,30 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
     }
 
     const body = await request.json()
-    const typeValue = typeof body.type === 'string' ? body.type : ''
-    const type = Object.values(BlockType).includes(typeValue as BlockType)
-      ? (typeValue as BlockType)
-      : null
+
+    // Robust validation: allow QUIZ even if local enum is stale
+    const allowedTypes = ['VIDEO_LESSON', 'RESOURCES', 'LIVE_SESSION', 'QUIZ'] as const
+    type AllowedType = typeof allowedTypes[number]
+    const typeValue = typeof body.type === 'string' ? (body.type as string) : ''
+    const isAllowed = allowedTypes.includes(typeValue as AllowedType)
+    const type = isAllowed ? (typeValue as any) : null
 
     if (!type) {
       return new NextResponse('Invalid block type', { status: 400 })
     }
 
-    const title = typeof body.title === 'string' ? body.title.trim() : ''
-    if (!title) {
-      return new NextResponse('Block title is required', { status: 400 })
+    // Helpful guard removed; rely on migrations and client regeneration
+
+    // Server-side default titles by type
+    const defaultTitleByType: Record<AllowedType, string> = {
+      VIDEO_LESSON: 'New Video Lesson',
+      RESOURCES: 'New Resources',
+      LIVE_SESSION: 'Aula virtuale BigBlueButton',
+      QUIZ: 'New Quiz',
     }
+
+    const titleRaw = typeof body.title === 'string' ? body.title : ''
+    const title = (titleRaw?.trim() || defaultTitleByType[type as AllowedType]) as string
 
     const position =
       lessonRecord.blocks.length > 0
@@ -62,7 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
     let liveSessionId: string | null = null
     let liveSessionConfig: Prisma.JsonObject | null = null
 
-    if (type === BlockType.LIVE_SESSION) {
+    if (type === 'LIVE_SESSION') {
       const now = new Date()
       const scheduledFor = typeof body.scheduledFor === 'string' ? new Date(body.scheduledFor) : new Date(now.getTime() + 60 * 60 * 1000)
       const durationMinutes = typeof body.durationMinutes === 'number' ? body.durationMinutes : 60
@@ -113,7 +124,7 @@ export async function POST(request: NextRequest, { params }: { params: RoutePara
     })
 
     // If this is a QUIZ block, initialize a Quiz record linked 1:1
-    if (type === BlockType.QUIZ) {
+    if (type === 'QUIZ') {
       await db.quiz.create({
         data: {
           companyId: company.id,

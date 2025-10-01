@@ -57,12 +57,12 @@ export const VideoPlayer = ({
   return (
     <div className="relative aspect-video">
       {!isReady && !isLocked && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
-          <Loader2 className="h-8 w-8 animate-spin text-secondary" />
+        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/80">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
         </div>
       )}
       {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-y-2 bg-slate-800 text-secondary">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-y-2 rounded-xl bg-black/80 text-white">
           <Lock className="h-8 w-8" />
           <p className="text-sm">This chapter is locked</p>
         </div>
@@ -70,7 +70,7 @@ export const VideoPlayer = ({
       {!isLocked && videoUrl ? (
         <video
           title={title}
-          className="h-full w-full rounded-md"
+          className="h-full w-full rounded-xl shadow-lg ring-1 ring-white/20"
           controls
           autoPlay
           onLoadedData={() => setIsReady(true)}
@@ -79,7 +79,7 @@ export const VideoPlayer = ({
         />
       ) : null}
       {!isLocked && !videoUrl ? (
-        <div className="flex h-full items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-100 text-sm text-muted-foreground">
+        <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-white/30 bg-white/40 text-sm text-muted-foreground backdrop-blur-md supports-[backdrop-filter]:bg-white/30">
           Lesson video will appear here once uploaded.
         </div>
       ) : null}
