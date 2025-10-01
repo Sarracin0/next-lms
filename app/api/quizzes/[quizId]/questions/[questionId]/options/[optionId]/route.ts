@@ -16,7 +16,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const body = await request.json()
   const patch: any = {}
-  for (const key of ['text','isCorrect','points','feedback']) {
+  for (const key of ['text','isCorrect','points']) {
     if (Object.prototype.hasOwnProperty.call(body, key)) patch[key] = body[key]
   }
 

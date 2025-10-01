@@ -19,8 +19,27 @@ export default async function ManageQuizPage({ params }: { params: Promise<{ cou
     notFound()
   }
 
-  const quiz = await db.quiz.findFirst({
-    where: { lessonBlockId: blockId, companyId: company.id },
+  if (profile.role === UserRole.TRAINER && block.lesson.module.course.createdByProfileId !== profile.id) {
+    notFound()
+  }
+
+  const quiz = await db.quiz.upsert({
+    where: { lessonBlockId: blockId },
+    update: {},
+    create: {
+      companyId: company.id,
+      createdByProfileId: profile.id,
+      lessonBlockId: blockId,
+      title: block.title || 'New Quiz',
+      description: block.content,
+      passScore: 70,
+      maxAttempts: 3,
+      timeLimitSeconds: 600,
+      shuffleQuestions: true,
+      shuffleOptions: true,
+      pointsReward: 100,
+      isPublished: false,
+    },
     include: {
       questions: {
         include: { options: true },
@@ -28,10 +47,6 @@ export default async function ManageQuizPage({ params }: { params: Promise<{ cou
       },
     },
   })
-
-  if (!quiz) {
-    notFound()
-  }
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">

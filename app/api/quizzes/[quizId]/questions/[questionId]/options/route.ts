@@ -23,7 +23,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       text,
       isCorrect: !!body.isCorrect,
       points: typeof body.points === 'number' ? body.points : 0,
-      feedback: typeof body.feedback === 'string' ? body.feedback : null,
     },
   })
 
