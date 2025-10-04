@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
 
 export type QuizResultsViewerQuestion = {
   id: string
@@ -38,8 +39,8 @@ type QuizResultsViewerProps = {
 export function QuizResultsViewer({ quiz, attempt, questions, retakeHref }: QuizResultsViewerProps) {
   return (
     <div className="space-y-6">
-      <Card className="border border-border/60 bg-card/80 shadow-sm">
-        <CardHeader className="space-y-2">
+      <Card className="rounded-xl border border-border/60 bg-card/80 shadow-sm">
+        <CardHeader className="space-y-3">
           <CardTitle className="text-lg font-semibold">Risultati quiz: {quiz.title}</CardTitle>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Badge variant={attempt.passed ? 'default' : 'secondary'} className="uppercase">
@@ -51,6 +52,10 @@ export function QuizResultsViewer({ quiz, attempt, questions, retakeHref }: Quiz
             {attempt.submittedAt ? (
               <span>Inviato il {attempt.submittedAt.toLocaleString()}</span>
             ) : null}
+          </div>
+          <div className="flex items-center gap-3">
+            <Progress value={attempt.percent} className="h-2 flex-1" />
+            <span className="text-xs text-muted-foreground">{attempt.percent}%</span>
           </div>
         </CardHeader>
         <CardContent className="flex items-center gap-3">
@@ -66,7 +71,7 @@ export function QuizResultsViewer({ quiz, attempt, questions, retakeHref }: Quiz
           const correctOptions = question.options.filter((opt) => opt.isCorrect)
 
           return (
-            <Card key={question.id} className="border border-border/50 bg-background/80">
+            <Card key={question.id} className="rounded-xl border border-border/60 bg-card/80 shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-medium text-foreground">
                   {index + 1}. {question.text}
@@ -95,12 +100,12 @@ export function QuizResultsViewer({ quiz, attempt, questions, retakeHref }: Quiz
                       <div
                         key={option.id}
                         data-state={state}
-                        className="flex items-start gap-2 rounded-md border border-border/40 bg-card/70 px-3 py-2 text-foreground data-[state=correct]:border-emerald-400 data-[state=correct]:bg-emerald-50 data-[state=selected]:border-amber-400 data-[state=selected]:bg-amber-50"
+                        className="group flex items-start gap-3 rounded-md border border-border/50 bg-card/60 p-3 ring-1 ring-transparent transition data-[state=correct]:bg-emerald-50 data-[state=correct]:ring-emerald-300/60 data-[state=selected]:bg-[#5D62E1]/5 data-[state=selected]:ring-[#5D62E1]/40"
                       >
-                        <span className="text-xs uppercase text-muted-foreground">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                           {isCorrectOption ? 'Corretta' : isSelected ? 'Scelta' : 'Opzione'}
                         </span>
-                        <span className="text-sm">{option.text}</span>
+                        <span className="text-sm text-foreground">{option.text}</span>
                       </div>
                     )
                   })}
