@@ -134,6 +134,7 @@ model Company {
   leaderboards Leaderboard[]
   liveSessions LiveSession[]
   quizzes      Quiz[]
+  flashcardDecks FlashcardDeck[]
 }
 
 model UserProfile {
@@ -173,6 +174,8 @@ model UserProfile {
   achievementsCreated     CourseAchievement[]     @relation("CourseAchievementCreatedBy")
   quizzesCreated          Quiz[]                  @relation("QuizCreatedBy")
   quizAttempts            QuizAttempt[]           @relation("QuizAttemptUser")
+  gamificationRequests    GamificationBlock[]
+  flashcardDecksCreated   FlashcardDeck[]
 }
 
 model CompanyTeam {

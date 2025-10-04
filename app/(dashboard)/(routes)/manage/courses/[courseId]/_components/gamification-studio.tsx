@@ -175,7 +175,6 @@ export const GamificationStudio = ({ courseId, moduleId, lessonId, block, onRepl
       const mappedFlashcards = flashcardsRaw
         ? {
             id: ensureString(flashcardsRaw.id) || block.gamification?.flashcardDeck?.id || generateId(),
-            ,
             title: ensureString(flashcardsRaw.title) || block.gamification?.flashcardDeck?.title || 'Deck',
             description: ensureNullableString(flashcardsRaw.description) ?? block.gamification?.flashcardDeck?.description ?? null,
             cardCount: flashcardCardsRaw.length,

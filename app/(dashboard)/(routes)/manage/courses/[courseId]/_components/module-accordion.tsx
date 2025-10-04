@@ -440,6 +440,7 @@ export const ModuleAccordion = ({
               onBlockSave={handleBlockSave}
               onBlockTogglePublish={handleBlockTogglePublish}
               onAddBlock={onAddBlock}
+              onReplaceBlock={onReplaceBlock}
               onDeleteLesson={onDeleteLesson}
               onDeleteBlock={onDeleteBlock}
               handleBlockAttachmentUpload={handleBlockAttachmentUpload}
@@ -511,9 +512,9 @@ const LessonItem = (props: LessonItemProps) => {
     onBlockUpdate,
     onBlockSave,
     onBlockTogglePublish,
-    onAddBlock,
-    onReplaceBlock,
-    onDeleteLesson,
+  onAddBlock,
+  onReplaceBlock,
+  onDeleteLesson,
     onDeleteBlock,
     handleBlockAttachmentUpload,
     handleBlockAttachmentDelete,

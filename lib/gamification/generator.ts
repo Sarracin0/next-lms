@@ -256,13 +256,16 @@ export async function generateGamificationContent(
     tool_choice: toolChoice,
     tools,
     input: [
-      { role: 'system', content: systemPrompt },
+      {
+        role: 'system',
+        content: [{ type: 'input_text', text: systemPrompt }],
+      },
       {
         role: 'user',
         content: [
-          { type: 'text', text: baseUserPrompt },
+          { type: 'input_text', text: baseUserPrompt },
           {
-            type: 'text',
+            type: 'input_text',
             text:
               input.contentType === GamificationContentType.QUIZ
                 ? 'Genera un quiz strutturato seguendo lo schema JSON della funzione create_quiz. Ogni domanda deve essere agganciata ai contenuti forniti.'
