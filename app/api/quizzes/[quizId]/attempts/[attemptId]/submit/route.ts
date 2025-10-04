@@ -7,7 +7,7 @@ import { Prisma, UserRole } from '@prisma/client'
 // Body shape: { answers: Array<{ questionId: string, selectedOptionIds?: string[], freeText?: string }> }
 export async function POST(request: NextRequest, { params }: { params: Promise<{ quizId: string; attemptId: string }> }) {
   const { profile, company } = await requireAuthContext()
-  assertRole(profile, [UserRole.LEARNER])
+  assertRole(profile, [UserRole.LEARNER, UserRole.HR_ADMIN, UserRole.TRAINER])
 
   const { quizId, attemptId } = await params
   const body = await request.json()

@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import type { Quiz, QuizQuestion, QuizOption, QuizAttempt } from '@prisma/client'
@@ -10,11 +11,16 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-export default function QuizPlayer({ quiz }: { quiz: Quiz & { questions: (QuizQuestion & { options: QuizOption[] })[] } }) {
+type QuizPlayerProps = {
+  quiz: Quiz & { questions: (QuizQuestion & { options: QuizOption[] })[] }
+  courseId: string
+}
+
+export default function QuizPlayer({ quiz, courseId }: QuizPlayerProps) {
+  const router = useRouter()
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null)
   const [answers, setAnswers] = useState<Record<string, { selectedOptionIds?: string[]; freeText?: string }>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [result, setResult] = useState<{ percent: number; totalScore: number; maxScore: number; passed: boolean } | null>(null)
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const totalQuestions = quiz.questions.length
@@ -61,8 +67,8 @@ export default function QuizPlayer({ quiz }: { quiz: Quiz & { questions: (QuizQu
         })),
       }
       const res = await axios.post(`/api/quizzes/${quiz.id}/attempts/${attempt.id}/submit`, payload)
-      setResult(res.data)
       toast.success(res.data.passed ? 'Quiz superato!' : 'Quiz inviato')
+      router.push(`/courses/${courseId}/quizzes/${quiz.id}/results/${attempt.id}`)
     } catch {
       toast.error('Errore durante l\'invio del quiz')
     } finally {
@@ -152,17 +158,6 @@ export default function QuizPlayer({ quiz }: { quiz: Quiz & { questions: (QuizQu
           </Button>
         )}
       </div>
-
-      {result && (
-        <Card className="rounded-xl border border-border/60 bg-muted/30 shadow-none">
-          <CardContent className="p-4 text-sm">
-            <p>
-              Score: {result.totalScore}/{result.maxScore} ({result.percent}%)
-            </p>
-            <p>{result.passed ? 'Stato: Superato ✅' : 'Stato: Non superato'}</p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

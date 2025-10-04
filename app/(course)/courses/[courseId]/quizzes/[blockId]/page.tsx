@@ -16,7 +16,7 @@ export default async function CourseQuizPage({ params }: { params: Promise<{ cou
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <QuizPlayer quiz={block.quiz} />
+      <QuizPlayer quiz={block.quiz} courseId={courseId} />
     </div>
   )
 }
