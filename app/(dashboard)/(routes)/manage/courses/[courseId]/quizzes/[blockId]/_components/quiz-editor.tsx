@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ListChecks, CheckCircle2, Type, Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function QuizEditor({
@@ -155,9 +157,27 @@ export default function QuizEditor({
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">Domande</h2>
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" disabled={!!creating.question} onClick={() => addQuestion('MULTIPLE_CHOICE')}>+ Multiple Choice</Button>
-          <Button size="sm" variant="secondary" disabled={!!creating.question} onClick={() => addQuestion('TRUE_FALSE')}>+ Vero/Falso</Button>
-          <Button size="sm" variant="secondary" disabled={!!creating.question} onClick={() => addQuestion('SHORT_ANSWER')}>+ Short Answer</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost" aria-label="Aggiungi domanda" title="Aggiungi domanda" disabled={!!creating.question}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => addQuestion('MULTIPLE_CHOICE')} disabled={!!creating.question}>
+                <ListChecks className="mr-2 h-4 w-4 text-[#5D62E1]" />
+                <span>Multiple choice</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => addQuestion('TRUE_FALSE')} disabled={!!creating.question}>
+                <CheckCircle2 className="mr-2 h-4 w-4 text-[#5D62E1]" />
+                <span>Vero / Falso</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => addQuestion('SHORT_ANSWER')} disabled={!!creating.question}>
+                <Type className="mr-2 h-4 w-4 text-[#5D62E1]" />
+                <span>Short answer</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
