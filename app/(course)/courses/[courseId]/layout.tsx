@@ -41,6 +41,11 @@ export default async function CourseLayout({ children, params }: CourseLayoutPro
                 where: { isPublished: true },
                 include: {
                   liveSession: { select: { meetingUrl: true } },
+                  gamification: {
+                    include: {
+                      flashcardDeck: { select: { id: true, title: true } },
+                    },
+                  },
                 },
                 orderBy: { position: 'asc' },
               },

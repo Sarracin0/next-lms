@@ -1,6 +1,6 @@
 'use client'
 
-import { LockIcon, PlayCircleIcon, FileTextIcon, VideoIcon } from 'lucide-react'
+import { LockIcon, PlayCircleIcon, FileTextIcon, VideoIcon, Sparkles } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { BlockData } from './course-sidebar.types'
@@ -31,6 +31,8 @@ export default function CourseSidebarBlock({ block, lessonId, courseId, isLocked
         return FileTextIcon
       case 'LIVE_SESSION':
         return PlayCircleIcon
+      case 'GAMIFICATION':
+        return Sparkles
       default:
         return FileTextIcon
     }
@@ -47,6 +49,21 @@ export default function CourseSidebarBlock({ block, lessonId, courseId, isLocked
     switch (block.type) {
       case 'QUIZ': {
         // Apri la pagina quiz per questo block
+        router.push(`/courses/${courseId}/quizzes/${block.id}`)
+        return
+      }
+      case 'GAMIFICATION': {
+        const contentType = block.gamification?.contentType
+
+        if (contentType === 'FLASHCARDS') {
+          const deckId = block.gamification?.flashcardDeck?.id
+          if (deckId) {
+            router.push(`/courses/${courseId}/flashcards/${deckId}`)
+            return
+          }
+        }
+
+        // Fallback to quiz experience if the deck is not available or the content is a quiz
         router.push(`/courses/${courseId}/quizzes/${block.id}`)
         return
       }
