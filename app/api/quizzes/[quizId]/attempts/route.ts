@@ -5,7 +5,7 @@ import { UserRole } from '@prisma/client'
 
 export async function POST(_: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
   const { profile, company } = await requireAuthContext()
-  assertRole(profile, [UserRole.LEARNER])
+  assertRole(profile, [UserRole.LEARNER, UserRole.HR_ADMIN, UserRole.TRAINER])
   const { quizId } = await params
 
   const quiz = await db.quiz.findFirst({ where: { id: quizId, companyId: company.id }, include: { attempts: { where: { userProfileId: profile.id } } } })
